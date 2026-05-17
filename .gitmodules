@@ -1,3 +1,6 @@
 [submodule "packages/qsarmodelingpyinterfaces"]
 	path = packages/qsarmodelingpyinterfaces
 	url = https://github.com/lacc-ufmg/QSARModelingPyInterfaces
+[submodule "packages/qsarmodelingpy"]
+	path = packages/qsarmodelingpy
+	url = https://github.com/hellmrf/QSARModelingPy
