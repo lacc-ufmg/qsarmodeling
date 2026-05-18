@@ -60,12 +60,61 @@ export default function Home() {
     testSetRatio: 0.2,
   });
 
+  const busyCopy: Record<BusyState, { label: string; description: string }> = {
+    idle: {
+      label: "Ready",
+      description: "Choose the input files, then step through preprocessing, selection, and validation.",
+    },
+    "loading-data": {
+      label: "Loading dataset",
+      description: "The app is building a mock dataset from the selected CSV file names.",
+    },
+    filtering: {
+      label: "Applying filters",
+      description: "Descriptor cuts and transforms are being applied to the active matrix.",
+    },
+    selecting: {
+      label: "Selecting variables",
+      description: "OPS or GA is running against the filtered matrix.",
+    },
+    validating: {
+      label: "Running validations",
+      description: "Cross validation and stability checks are being evaluated.",
+    },
+  };
+
   const appendTimeline = (message: string): void => {
     setTimeline((current) => [
       `${new Date().toLocaleTimeString()} - ${message}`,
       ...current.slice(0, 7),
     ]);
   };
+
+  const currentBusyCopy = busyCopy[busyState];
+
+  const nextStepMessage = useMemo(() => {
+    if (busyState !== "idle") {
+      return `Wait for ${currentBusyCopy.label.toLowerCase()} to finish before moving on.`;
+    }
+
+    if (!matrixFileName || !vectorFileName) {
+      return "Select both CSV files to unlock the dataset loader.";
+    }
+
+    if (!uploadedDataset) {
+      return "Load the dataset first so preprocessing and selection can use the active matrix.";
+    }
+
+    if (!selectionResult) {
+      return "Review the preprocessing settings, then run variable selection.";
+    }
+
+    if (!validationResult) {
+      return "Run the validation suite to confirm model quality and stability.";
+    }
+
+    return "Try a different filter or selection configuration to compare outcomes.";
+  }, [busyState, currentBusyCopy.label, matrixFileName, uploadedDataset, selectionResult, validationResult, vectorFileName]);
 
   const canRunFilters = Boolean(activeDataset) && busyState === "idle";
   const canRunSelection = Boolean(activeDataset) && busyState === "idle";
@@ -76,27 +125,40 @@ export default function Home() {
     () => [
       {
         label: "Data",
-        status: uploadedDataset ? "done" : "pending",
+        status: uploadedDataset ? "Loaded" : matrixFileName && vectorFileName ? "Ready to load" : "Waiting for files",
+        detail: uploadedDataset
+          ? `${uploadedDataset.matrixName} and ${uploadedDataset.vectorName}`
+          : "Choose both X and y CSV files first.",
       },
       {
         label: "Preprocessing",
         status:
           activeDataset?.source === "filtered"
-            ? "done"
+            ? "Applied"
             : uploadedDataset
-              ? "ready"
-              : "pending",
+              ? "Ready to run"
+              : "Blocked",
+        detail:
+          activeDataset?.source === "filtered"
+            ? `${activeDataset.descriptors} descriptors active`
+            : "Tune the descriptor cuts and transforms.",
       },
       {
         label: "Selection",
-        status: selectionResult ? "done" : activeDataset ? "ready" : "pending",
+        status: selectionResult ? "Completed" : activeDataset ? "Ready to run" : "Blocked",
+        detail: selectionResult
+          ? `${selectionResult.method.toUpperCase()} selected ${selectionResult.selectedDescriptors} descriptors`
+          : "Pick OPS or GA after preprocessing.",
       },
       {
         label: "Validation",
-        status: validationResult ? "done" : selectionResult ? "ready" : "pending",
+        status: validationResult ? "Completed" : selectionResult ? "Ready to run" : "Blocked",
+        detail: validationResult
+          ? "Validation metrics are available below."
+          : "Run the checks you want to inspect.",
       },
     ],
-    [activeDataset, selectionResult, uploadedDataset, validationResult]
+    [activeDataset, matrixFileName, selectionResult, uploadedDataset, validationResult, vectorFileName]
   );
 
   async function handleLoadData(): Promise<void> {
@@ -196,18 +258,56 @@ export default function Home() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 text-zinc-900 dark:text-zinc-100 sm:px-8">
-      <header className="mb-6">
-        <h1 className="text-3xl font-semibold tracking-tight">QSAR Model Builder</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Guided flow based on QSARModelingPyInterfaces: load data, preprocess descriptors, run OPS/GA, validate, and inspect results.
-        </p>
+      <header className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)] lg:items-end">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-indigo-600 dark:text-indigo-400">
+            Guided workflow
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+            QSAR Model Builder
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Follow the steps in order: choose the matrix files, load the dataset, tune preprocessing,
+            run OPS or GA, and finish with validation. The UI keeps the current state visible so you
+            always know what is happening and what to do next.
+          </p>
+        </div>
+
+        <aside className="rounded-3xl border border-zinc-200 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500 dark:text-zinc-400">
+            Current status
+          </p>
+          <p className="mt-2 text-lg font-semibold">{currentBusyCopy.label}</p>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{currentBusyCopy.description}</p>
+          <p className="mt-3 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+            Next: {nextStepMessage}
+          </p>
+        </aside>
       </header>
+
+      <section className="mb-5 rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-white to-amber-50 p-4 shadow-sm dark:border-indigo-900/40 dark:from-indigo-950/30 dark:via-zinc-950 dark:to-amber-950/20">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">How to use this screen</p>
+            <ol className="mt-2 space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
+              <li>1. Pick both CSV files so the loader can create a mock dataset.</li>
+              <li>2. Run preprocessing if you want to see how descriptor cuts change the matrix.</li>
+              <li>3. Choose OPS or GA, then run validation to inspect the final metrics.</li>
+            </ol>
+          </div>
+          <div className="rounded-2xl border border-indigo-200/80 bg-white/80 p-3 text-sm text-zinc-700 shadow-sm dark:border-indigo-900/60 dark:bg-zinc-950/70 dark:text-zinc-300">
+            <p className="font-medium text-zinc-900 dark:text-zinc-100">What changes as you progress</p>
+            <p className="mt-1">Each step unlocks the next, and the timeline records every action so you can compare runs later.</p>
+          </div>
+        </div>
+      </section>
 
       <div className="mb-5 grid gap-2 sm:grid-cols-4">
         {stages.map((stage) => (
           <div key={stage.label} className={`${panelClass} py-3`}>
             <p className="text-sm font-medium">{stage.label}</p>
-            <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{stage.status}</p>
+            <p className="mt-1 text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{stage.status}</p>
+            <p className="mt-2 text-xs leading-5 text-zinc-600 dark:text-zinc-400">{stage.detail}</p>
           </div>
         ))}
       </div>
@@ -218,9 +318,18 @@ export default function Home() {
         </div>
       ) : null}
 
+      {busyState !== "idle" ? (
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+          {currentBusyCopy.label} is in progress. Keep the current files and settings in place until the step completes.
+        </div>
+      ) : null}
+
       <main className="grid gap-4 lg:grid-cols-3">
         <section className={`${panelClass} lg:col-span-2`}>
           <h2 className="text-lg font-medium">1. Load matrix and vector</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Start here. The mock backend uses the selected file names to build a dataset profile, so both inputs are required before any other step becomes meaningful.
+          </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
               <span className="mb-1 block font-medium">X matrix (.csv)</span>
@@ -232,6 +341,9 @@ export default function Home() {
                   setMatrixFileName(event.target.files?.[0]?.name ?? "")
                 }
               />
+              <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">
+                Selected: {matrixFileName || "no file yet"}
+              </span>
             </label>
             <label className="text-sm">
               <span className="mb-1 block font-medium">y vector (.csv)</span>
@@ -243,6 +355,9 @@ export default function Home() {
                   setVectorFileName(event.target.files?.[0]?.name ?? "")
                 }
               />
+              <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">
+                Selected: {vectorFileName || "no file yet"}
+              </span>
             </label>
           </div>
           <button
@@ -251,14 +366,19 @@ export default function Home() {
             className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
             onClick={handleLoadData}
           >
-            {busyState === "loading-data" ? "Loading..." : "Load dataset"}
+            {busyState === "loading-data" ? "Loading dataset..." : "Load dataset and unlock preprocessing"}
           </button>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            You can also jump straight to the full pipeline once both files are selected.
+          </p>
         </section>
 
         <section className={panelClass}>
           <h2 className="text-lg font-medium">Active data summary</h2>
           {!activeDataset ? (
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">No dataset loaded yet.</p>
+            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+              No dataset loaded yet. Select files and load them to see row and descriptor counts here.
+            </p>
           ) : (
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between gap-3">
@@ -273,12 +393,23 @@ export default function Home() {
                 <dt className="text-zinc-500">Source</dt>
                 <dd className="font-medium capitalize">{activeDataset.source}</dd>
               </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-zinc-500">Matrix file</dt>
+                <dd className="font-medium text-right">{activeDataset.matrixName}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-zinc-500">Vector file</dt>
+                <dd className="font-medium text-right">{activeDataset.vectorName}</dd>
+              </div>
             </dl>
           )}
         </section>
 
         <section className={`${panelClass} lg:col-span-2`}>
           <h2 className="text-lg font-medium">2. Descriptor preprocessing</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Use these controls to reduce noisy descriptors and prepare the active matrix for model selection.
+          </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <NumberField
               label="Variance cut"
@@ -333,17 +464,22 @@ export default function Home() {
             className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700"
             onClick={handleRunFilters}
           >
-            {busyState === "filtering" ? "Filtering..." : "Apply filters and update active matrix"}
+            {busyState === "filtering" ? "Filtering..." : "Apply filters to the active matrix"}
           </button>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Disabled until a dataset is loaded.
+          </p>
         </section>
 
         <section className={panelClass}>
           <h2 className="text-lg font-medium">3. Selection method</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Choose the selection strategy, then tune only the settings that belong to that method.
+          </p>
           <fieldset className="mt-3 flex gap-3 text-sm">
             <label className="inline-flex items-center gap-2">
               <input
                 type="radio"
-                name="method"
                 checked={selectionSettings.method === "ops"}
                 onChange={() => setSelectionSettings((prev) => ({ ...prev, method: "ops" }))}
               />
@@ -445,12 +581,18 @@ export default function Home() {
             className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700"
             onClick={handleRunSelection}
           >
-            {busyState === "selecting" ? "Selecting..." : "Run variable selection"}
+            {busyState === "selecting" ? "Selecting..." : "Run variable selection on the active matrix"}
           </button>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Disabled until preprocessing has produced an active dataset.
+          </p>
         </section>
 
         <section className={`${panelClass} lg:col-span-2`}>
           <h2 className="text-lg font-medium">4. Validation suite</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Run whichever checks you need. These metrics show whether the selected model is stable enough to trust.
+          </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Switch
               label="Cross validation"
@@ -520,7 +662,7 @@ export default function Home() {
               className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700"
               onClick={handleRunValidation}
             >
-              {busyState === "validating" ? "Validating..." : "Run validations"}
+              {busyState === "validating" ? "Validating..." : "Run validations for the selected model"}
             </button>
             <button
               type="button"
@@ -528,15 +670,20 @@ export default function Home() {
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               onClick={handleRunPipeline}
             >
-              Run complete mocked pipeline
+              Run the full mocked pipeline
             </button>
           </div>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Full pipeline mode loads data, applies preprocessing, runs selection, and finishes with validation in one pass.
+          </p>
         </section>
 
         <section className={panelClass}>
           <h2 className="text-lg font-medium">Results</h2>
           {!selectionResult ? (
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Selection metrics will appear here.</p>
+            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+              Selection metrics will appear here after you run OPS or GA.
+            </p>
           ) : (
             <div className="mt-3 space-y-2 text-sm">
               <Metric label="Method" value={selectionResult.method.toUpperCase()} />
@@ -582,7 +729,9 @@ export default function Home() {
         <section className={`${panelClass} lg:col-span-3`}>
           <h2 className="text-lg font-medium">Workflow timeline</h2>
           {timeline.length === 0 ? (
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Start by loading data to build your run history.</p>
+            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+              Start by loading data to build your run history. Each action will be added here as a compact audit trail.
+            </p>
           ) : (
             <ul className="mt-3 space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
               {timeline.map((item) => (
