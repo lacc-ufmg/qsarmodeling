@@ -1,5 +1,7 @@
 {
     "recommendations": [
-        "yzhang.markdown-all-in-one"
+        "yzhang.markdown-all-in-one",
+        "ms-python.python",
+        "ms-python.vscode-pylance"
     ]
 }

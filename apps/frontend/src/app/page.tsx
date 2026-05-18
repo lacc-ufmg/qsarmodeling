@@ -8,10 +8,11 @@ import {
   type SelectionSettings,
   type ValidationResult,
   type ValidationSettings,
-  mockLoadDataset,
-  mockRunFilters,
-  mockRunSelection,
-  mockRunValidations,
+  loadDataset,
+  runFilters,
+  runSelection,
+  runValidations,
+  runPipeline,
 } from "@/lib/mockQsarBackend";
 
 type BusyState = "idle" | "loading-data" | "filtering" | "selecting" | "validating";
@@ -20,8 +21,11 @@ const panelClass =
   "rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950";
 
 export default function Home() {
-  const [matrixFileName, setMatrixFileName] = useState("");
-  const [vectorFileName, setVectorFileName] = useState("");
+  const [matrixFile, setMatrixFile] = useState<File | null>(null);
+  const [vectorFile, setVectorFile] = useState<File | null>(null);
+
+  const matrixFileName = matrixFile?.name ?? "";
+  const vectorFileName = vectorFile?.name ?? "";
 
   const [uploadedDataset, setUploadedDataset] = useState<DatasetProfile | null>(null);
   const [activeDataset, setActiveDataset] = useState<DatasetProfile | null>(null);
@@ -67,7 +71,7 @@ export default function Home() {
     },
     "loading-data": {
       label: "Loading dataset",
-      description: "The app is building a mock dataset from the selected CSV file names.",
+      description: "The app is loading the uploaded CSV files into a backend session.",
     },
     filtering: {
       label: "Applying filters",
@@ -119,7 +123,7 @@ export default function Home() {
   const canRunFilters = Boolean(activeDataset) && busyState === "idle";
   const canRunSelection = Boolean(activeDataset) && busyState === "idle";
   const canRunValidation = Boolean(selectionResult) && busyState === "idle";
-  const canRunPipeline = Boolean(matrixFileName && vectorFileName) && busyState === "idle";
+  const canRunPipeline = Boolean(matrixFile && vectorFile) && busyState === "idle";
 
   const stages = useMemo(
     () => [
@@ -162,67 +166,75 @@ export default function Home() {
   );
 
   async function handleLoadData(): Promise<void> {
-    if (!matrixFileName || !vectorFileName) {
+    if (!matrixFile || !vectorFile) {
       setError("Select both X matrix and y vector files before loading.");
       return;
     }
     setError("");
     setBusyState("loading-data");
     try {
-      const loaded = await mockLoadDataset(matrixFileName, vectorFileName);
+      const loaded = await loadDataset(matrixFile, vectorFile);
       setUploadedDataset(loaded);
       setActiveDataset(loaded);
       setSelectionResult(null);
       setValidationResult(null);
       appendTimeline(`Loaded dataset (${loaded.rows} rows, ${loaded.descriptors} descriptors).`);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load dataset.");
     } finally {
       setBusyState("idle");
     }
   }
 
   async function handleRunFilters(): Promise<void> {
-    if (!activeDataset) return;
+    if (!uploadedDataset) return;
     setBusyState("filtering");
     try {
-      const filtered = await mockRunFilters(activeDataset, filterSettings);
+      const filtered = await runFilters(uploadedDataset.sessionId, filterSettings);
       setActiveDataset(filtered);
       setSelectionResult(null);
       setValidationResult(null);
       appendTimeline(`Applied descriptor filters. Active matrix now has ${filtered.descriptors} descriptors.`);
+    } catch (filterError) {
+      setError(filterError instanceof Error ? filterError.message : "Failed to run descriptor filters.");
     } finally {
       setBusyState("idle");
     }
   }
 
   async function handleRunSelection(): Promise<void> {
-    if (!activeDataset) return;
+    if (!uploadedDataset) return;
     setBusyState("selecting");
     try {
-      const selected = await mockRunSelection(activeDataset, selectionSettings);
+      const selected = await runSelection(uploadedDataset.sessionId, filterSettings, selectionSettings);
       setSelectionResult(selected);
       setValidationResult(null);
       appendTimeline(
         `${selected.method.toUpperCase()} selected ${selected.selectedDescriptors} descriptors (Q² ${selected.q2.toFixed(3)}).`
       );
+    } catch (selectionError) {
+      setError(selectionError instanceof Error ? selectionError.message : "Failed to run variable selection.");
     } finally {
       setBusyState("idle");
     }
   }
 
   async function handleRunValidation(): Promise<void> {
-    if (!selectionResult) return;
+    if (!uploadedDataset) return;
     setBusyState("validating");
     try {
-      const results = await mockRunValidations(selectionResult, validationSettings);
+      const results = await runValidations(uploadedDataset.sessionId, validationSettings);
       setValidationResult(results);
       appendTimeline("Validation suite completed.");
+    } catch (validationError) {
+      setError(validationError instanceof Error ? validationError.message : "Failed to run validations.");
     } finally {
       setBusyState("idle");
     }
   }
 
   async function handleRunPipeline(): Promise<void> {
-    if (!matrixFileName || !vectorFileName) {
+    if (!matrixFile || !vectorFile) {
       setError("Select both X matrix and y vector files before running the full pipeline.");
       return;
     }
@@ -230,27 +242,30 @@ export default function Home() {
     setError("");
     setBusyState("loading-data");
     try {
-      const loaded = await mockLoadDataset(matrixFileName, vectorFileName);
+      const loaded = await loadDataset(matrixFile, vectorFile);
       setUploadedDataset(loaded);
+      setSelectionResult(null);
+      setValidationResult(null);
       appendTimeline(`Loaded dataset (${loaded.rows} rows, ${loaded.descriptors} descriptors).`);
 
       setBusyState("filtering");
-      const filtered = await mockRunFilters(loaded, filterSettings);
-      setActiveDataset(filtered);
-      appendTimeline(`Applied descriptor filters. Active matrix now has ${filtered.descriptors} descriptors.`);
-
-      setBusyState("selecting");
-      const selected = await mockRunSelection(filtered, selectionSettings);
-      setSelectionResult(selected);
-      appendTimeline(
-        `${selected.method.toUpperCase()} selected ${selected.selectedDescriptors} descriptors (Q² ${selected.q2.toFixed(3)}).`
+      const pipeline = await runPipeline(
+        loaded.sessionId,
+        filterSettings,
+        selectionSettings,
+        validationSettings
       );
-
-      setBusyState("validating");
-      const validated = await mockRunValidations(selected, validationSettings);
-      setValidationResult(validated);
+      setActiveDataset(pipeline.dataset);
+      setSelectionResult(pipeline.selection);
+      setValidationResult(pipeline.validation);
+      appendTimeline(`Applied descriptor filters. Active matrix now has ${pipeline.dataset.descriptors} descriptors.`);
+      appendTimeline(
+        `${pipeline.selection.method.toUpperCase()} selected ${pipeline.selection.selectedDescriptors} descriptors (Q² ${pipeline.selection.q2.toFixed(3)}).`
+      );
       appendTimeline("Validation suite completed.");
-      appendTimeline("Full pipeline finished with mocked backend responses.");
+      appendTimeline("Full pipeline finished with backend results.");
+    } catch (pipelineError) {
+      setError(pipelineError instanceof Error ? pipelineError.message : "Failed to run the full pipeline.");
     } finally {
       setBusyState("idle");
     }
@@ -290,7 +305,7 @@ export default function Home() {
           <div>
             <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">How to use this screen</p>
             <ol className="mt-2 space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
-              <li>1. Pick both CSV files so the loader can create a mock dataset.</li>
+              <li>1. Pick both CSV files so the loader can create a backend session.</li>
               <li>2. Run preprocessing if you want to see how descriptor cuts change the matrix.</li>
               <li>3. Choose OPS or GA, then run validation to inspect the final metrics.</li>
             </ol>
@@ -338,7 +353,7 @@ export default function Home() {
                 accept=".csv"
                 className="block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
                 onChange={(event) =>
-                  setMatrixFileName(event.target.files?.[0]?.name ?? "")
+                  setMatrixFile(event.target.files?.[0] ?? null)
                 }
               />
               <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">
@@ -352,7 +367,7 @@ export default function Home() {
                 accept=".csv"
                 className="block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
                 onChange={(event) =>
-                  setVectorFileName(event.target.files?.[0]?.name ?? "")
+                  setVectorFile(event.target.files?.[0] ?? null)
                 }
               />
               <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">
@@ -366,7 +381,7 @@ export default function Home() {
             className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
             onClick={handleLoadData}
           >
-            {busyState === "loading-data" ? "Loading dataset..." : "Load dataset and unlock preprocessing"}
+              {busyState === "loading-data" ? "Loading dataset..." : "Load dataset and unlock preprocessing"}
           </button>
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
             You can also jump straight to the full pipeline once both files are selected.
@@ -670,7 +685,7 @@ export default function Home() {
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               onClick={handleRunPipeline}
             >
-              Run the full mocked pipeline
+              Run the full pipeline
             </button>
           </div>
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
@@ -691,6 +706,10 @@ export default function Home() {
               <Metric label="Latent variables" value={selectionResult.latentVariables} />
               <Metric label="Q²" value={selectionResult.q2.toFixed(3)} />
               <Metric label="R²" value={selectionResult.r2.toFixed(3)} />
+              <Metric
+                label="Package checks"
+                value={selectionResult.validationPassed ? "Passed" : "Did not pass"}
+              />
             </div>
           )}
           {validationResult ? (
