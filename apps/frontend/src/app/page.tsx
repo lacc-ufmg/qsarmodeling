@@ -124,6 +124,7 @@ export default function Home() {
   const canRunSelection = Boolean(activeDataset) && busyState === "idle";
   const canRunValidation = Boolean(selectionResult) && busyState === "idle";
   const canRunPipeline = Boolean(matrixFile && vectorFile) && busyState === "idle";
+  const canLoadData = Boolean(matrixFile && vectorFile) && busyState === "idle";
 
   const stages = useMemo(
     () => [
@@ -317,14 +318,136 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="mb-5 grid gap-2 sm:grid-cols-4">
-        {stages.map((stage) => (
-          <div key={stage.label} className={`${panelClass} py-3`}>
-            <p className="text-sm font-medium">{stage.label}</p>
-            <p className="mt-1 text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{stage.status}</p>
-            <p className="mt-2 text-xs leading-5 text-zinc-600 dark:text-zinc-400">{stage.detail}</p>
+      <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className={`${panelClass} py-4`}>
+          <p className="text-sm font-medium">Pipeline steps</p>
+          <div className="mt-3 space-y-3">
+            {stages.map((stage) => {
+              const isRunning =
+                (stage.label === "Data" && busyState === "loading-data") ||
+                (stage.label === "Preprocessing" && busyState === "filtering") ||
+                (stage.label === "Selection" && busyState === "selecting") ||
+                (stage.label === "Validation" && busyState === "validating");
+
+              // status badge mapping to visual state
+              const visual = (() => {
+                if (isRunning) return "running";
+                if (stage.label === "Data") return uploadedDataset ? "done" : matrixFileName && vectorFileName ? "ready" : "waiting";
+                if (stage.label === "Preprocessing") return activeDataset?.source === "filtered" ? "done" : uploadedDataset ? "ready" : "blocked";
+                if (stage.label === "Selection") return selectionResult ? "done" : activeDataset ? "ready" : "blocked";
+                if (stage.label === "Validation") return validationResult ? "done" : selectionResult ? "ready" : "blocked";
+                return "waiting";
+              })();
+
+              const icon = (
+                <span className="inline-flex h-6 w-6 items-center justify-center">
+                  {visual === "done" ? (
+                    <svg className="h-5 w-5 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : visual === "blocked" || visual === "waiting" ? (
+                    <svg className="h-5 w-5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                    </svg>
+                  ) : visual === "ready" ? (
+                    <svg className="h-5 w-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5 animate-spin text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  )}
+                </span>
+              );
+
+              const disabled = busyState !== "idle" && !isRunning;
+
+              return (
+                <div key={stage.label} className="flex items-start justify-between gap-3 rounded-md border border-zinc-100 p-3 dark:border-zinc-800">
+                  <div className="flex items-start gap-3">
+                    {icon}
+                    <div>
+                      <p className="font-medium">{stage.label}</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">{stage.detail}</p>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {stage.label === "Data" ? (
+                      <button
+                        type="button"
+                        disabled={!canLoadData}
+                        className="rounded-md bg-zinc-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed dark:bg-zinc-100 dark:text-zinc-900 flex items-center gap-2"
+                        onClick={handleLoadData}
+                      >
+                        {isRunning ? <svg className="h-4 w-4 animate-spin text-amber-50" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="4" stroke="currentColor" strokeDasharray="31.4 31.4" fill="none" /></svg> : null}
+                        {isRunning ? "Loading" : "Load dataset"}
+                      </button>
+                    ) : stage.label === "Preprocessing" ? (
+                      <button
+                        type="button"
+                        disabled={!canRunFilters}
+                        className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed dark:border-zinc-700"
+                        onClick={handleRunFilters}
+                      >
+                        {isRunning ? <svg className="h-4 w-4 animate-spin text-amber-600" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="4" stroke="currentColor" strokeDasharray="31.4 31.4" fill="none" /></svg> : null}
+                        {isRunning ? "Filtering" : "Apply filters"}
+                      </button>
+                    ) : stage.label === "Selection" ? (
+                      <button
+                        type="button"
+                        disabled={!canRunSelection}
+                        className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed dark:border-zinc-700"
+                        onClick={handleRunSelection}
+                      >
+                        {isRunning ? <svg className="h-4 w-4 animate-spin text-amber-600" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="4" stroke="currentColor" strokeDasharray="31.4 31.4" fill="none" /></svg> : null}
+                        {isRunning ? "Selecting" : "Run selection"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!canRunValidation}
+                        className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed dark:border-zinc-700"
+                        onClick={handleRunValidation}
+                      >
+                        {isRunning ? <svg className="h-4 w-4 animate-spin text-amber-600" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="4" stroke="currentColor" strokeDasharray="31.4 31.4" fill="none" /></svg> : null}
+                        {isRunning ? "Validating" : "Run validation"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        ))}
+        </div>
+
+        <aside className={`${panelClass} sticky top-20 h-fit`}>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500 dark:text-zinc-400">Current status</p>
+          <p className="mt-2 text-lg font-semibold">{currentBusyCopy.label}</p>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{currentBusyCopy.description}</p>
+          <div className="mt-3 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">Next: {nextStepMessage}</div>
+          <div className="mt-4 border-t pt-3 text-sm">
+            <h3 className="font-medium">Active data</h3>
+            {!activeDataset ? (
+              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">No dataset loaded yet.</p>
+            ) : (
+              <dl className="mt-2 space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-zinc-500">Rows</dt>
+                  <dd className="font-medium">{activeDataset.rows}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-zinc-500">Descriptors</dt>
+                  <dd className="font-medium">{activeDataset.descriptors}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-zinc-500">Source</dt>
+                  <dd className="font-medium capitalize">{activeDataset.source}</dd>
+                </div>
+              </dl>
+            )}
+          </div>
+        </aside>
       </div>
 
       {error ? (
@@ -388,37 +511,7 @@ export default function Home() {
           </p>
         </section>
 
-        <section className={panelClass}>
-          <h2 className="text-lg font-medium">Active data summary</h2>
-          {!activeDataset ? (
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
-              No dataset loaded yet. Select files and load them to see row and descriptor counts here.
-            </p>
-          ) : (
-            <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between gap-3">
-                <dt className="text-zinc-500">Rows</dt>
-                <dd className="font-medium">{activeDataset.rows}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-zinc-500">Descriptors</dt>
-                <dd className="font-medium">{activeDataset.descriptors}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-zinc-500">Source</dt>
-                <dd className="font-medium capitalize">{activeDataset.source}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-zinc-500">Matrix file</dt>
-                <dd className="font-medium text-right">{activeDataset.matrixName}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-zinc-500">Vector file</dt>
-                <dd className="font-medium text-right">{activeDataset.vectorName}</dd>
-              </div>
-            </dl>
-          )}
-        </section>
+
 
         <section className={`${panelClass} lg:col-span-2`}>
           <h2 className="text-lg font-medium">2. Descriptor preprocessing</h2>
