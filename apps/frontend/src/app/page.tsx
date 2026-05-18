@@ -15,10 +15,68 @@ import {
   runPipeline,
 } from "@/lib/mockQsarBackend";
 
+// Tooltip component for parameter help
+function Tooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative inline-block">
+      <button
+        type="button"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+      >
+        ?
+      </button>
+      {show && (
+        <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-900 px-3 py-2 text-xs text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900">
+          {text}
+          <div className="absolute top-full left-1/2 h-0 w-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-zinc-900 -translate-x-1/2 dark:border-t-zinc-100" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Expandable section for fine-tune settings
+function ExpandableSection({ title, children }: { title: string; children: React.ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="mt-4 border-t pt-4">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300"
+      >
+        <svg className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7-7m0 0L5 14" />
+        </svg>
+        {title}
+      </button>
+      {expanded && <div className="mt-3 space-y-3">{children}</div>}
+    </div>
+  );
+}
+
+// Result card component
+function ResultCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-4 border-t pt-4">
+      <h3 className="text-sm font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        {title}
+      </h3>
+      <div className="mt-2 space-y-1 text-sm">{children}</div>
+    </div>
+  );
+}
+
 type BusyState = "idle" | "loading-data" | "filtering" | "selecting" | "validating";
 
 const panelClass =
-  "rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950";
+  "rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950";
 
 export default function Home() {
   const [matrixFile, setMatrixFile] = useState<File | null>(null);
@@ -273,8 +331,8 @@ export default function Home() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8 text-zinc-900 dark:text-zinc-100 sm:px-8">
-      <header className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)] lg:items-end">
+    <div className="mx-auto w-full max-w-4xl px-4 py-8 text-zinc-900 dark:text-zinc-100 sm:px-8">
+      <header className="mb-8">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.24em] text-indigo-600 dark:text-indigo-400">
             Guided workflow
@@ -283,612 +341,664 @@ export default function Home() {
             QSAR Model Builder
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-            Follow the steps in order: choose the matrix files, load the dataset, tune preprocessing,
-            run OPS or GA, and finish with validation. The UI keeps the current state visible so you
-            always know what is happening and what to do next.
+            A guided workflow for QSAR model development. Follow the steps in order, and we'll help you at each stage with sensible defaults and detailed explanations.
           </p>
         </div>
-
-        <aside className="rounded-3xl border border-zinc-200 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500 dark:text-zinc-400">
-            Current status
-          </p>
-          <p className="mt-2 text-lg font-semibold">{currentBusyCopy.label}</p>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{currentBusyCopy.description}</p>
-          <p className="mt-3 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-            Next: {nextStepMessage}
-          </p>
-        </aside>
       </header>
 
-      <section className="mb-5 rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-white to-amber-50 p-4 shadow-sm dark:border-indigo-900/40 dark:from-indigo-950/30 dark:via-zinc-950 dark:to-amber-950/20">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] lg:items-center">
-          <div>
-            <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">How to use this screen</p>
-            <ol className="mt-2 space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
-              <li>1. Pick both CSV files so the loader can create a backend session.</li>
-              <li>2. Run preprocessing if you want to see how descriptor cuts change the matrix.</li>
-              <li>3. Choose OPS or GA, then run validation to inspect the final metrics.</li>
-            </ol>
-          </div>
-          <div className="rounded-2xl border border-indigo-200/80 bg-white/80 p-3 text-sm text-zinc-700 shadow-sm dark:border-indigo-900/60 dark:bg-zinc-950/70 dark:text-zinc-300">
-            <p className="font-medium text-zinc-900 dark:text-zinc-100">What changes as you progress</p>
-            <p className="mt-1">Each step unlocks the next, and the timeline records every action so you can compare runs later.</p>
-          </div>
-        </div>
-      </section>
-
-      <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className={`${panelClass} py-4`}>
-          <p className="text-sm font-medium">Pipeline steps</p>
-          <div className="mt-3 space-y-3">
-            {stages.map((stage) => {
-              const isRunning =
-                (stage.label === "Data" && busyState === "loading-data") ||
-                (stage.label === "Preprocessing" && busyState === "filtering") ||
-                (stage.label === "Selection" && busyState === "selecting") ||
-                (stage.label === "Validation" && busyState === "validating");
-
-              // status badge mapping to visual state
-              const visual = (() => {
-                if (isRunning) return "running";
-                if (stage.label === "Data") return uploadedDataset ? "done" : matrixFileName && vectorFileName ? "ready" : "waiting";
-                if (stage.label === "Preprocessing") return activeDataset?.source === "filtered" ? "done" : uploadedDataset ? "ready" : "blocked";
-                if (stage.label === "Selection") return selectionResult ? "done" : activeDataset ? "ready" : "blocked";
-                if (stage.label === "Validation") return validationResult ? "done" : selectionResult ? "ready" : "blocked";
-                return "waiting";
-              })();
-
-              const icon = (
-                <span className="inline-flex h-6 w-6 items-center justify-center">
-                  {visual === "done" ? (
-                    <svg className="h-5 w-5 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : visual === "blocked" || visual === "waiting" ? (
-                    <svg className="h-5 w-5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <circle cx="12" cy="12" r="9" strokeWidth="2" />
-                    </svg>
-                  ) : visual === "ready" ? (
-                    <svg className="h-5 w-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 animate-spin text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                    </svg>
-                  )}
-                </span>
-              );
-
-              const disabled = busyState !== "idle" && !isRunning;
-
-              return (
-                <div key={stage.label} className="flex items-start justify-between gap-3 rounded-md border border-zinc-100 p-3 dark:border-zinc-800">
-                  <div className="flex items-start gap-3">
-                    {icon}
-                    <div>
-                      <p className="font-medium">{stage.label}</p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">{stage.detail}</p>
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0">
-                    {stage.label === "Data" ? (
-                      <button
-                        type="button"
-                        disabled={!canLoadData}
-                        className="rounded-md bg-zinc-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed dark:bg-zinc-100 dark:text-zinc-900 flex items-center gap-2"
-                        onClick={handleLoadData}
-                      >
-                        {isRunning ? <svg className="h-4 w-4 animate-spin text-amber-50" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="4" stroke="currentColor" strokeDasharray="31.4 31.4" fill="none" /></svg> : null}
-                        {isRunning ? "Loading" : "Load dataset"}
-                      </button>
-                    ) : stage.label === "Preprocessing" ? (
-                      <button
-                        type="button"
-                        disabled={!canRunFilters}
-                        className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed dark:border-zinc-700"
-                        onClick={handleRunFilters}
-                      >
-                        {isRunning ? <svg className="h-4 w-4 animate-spin text-amber-600" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="4" stroke="currentColor" strokeDasharray="31.4 31.4" fill="none" /></svg> : null}
-                        {isRunning ? "Filtering" : "Apply filters"}
-                      </button>
-                    ) : stage.label === "Selection" ? (
-                      <button
-                        type="button"
-                        disabled={!canRunSelection}
-                        className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed dark:border-zinc-700"
-                        onClick={handleRunSelection}
-                      >
-                        {isRunning ? <svg className="h-4 w-4 animate-spin text-amber-600" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="4" stroke="currentColor" strokeDasharray="31.4 31.4" fill="none" /></svg> : null}
-                        {isRunning ? "Selecting" : "Run selection"}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={!canRunValidation}
-                        className="rounded-md border border-zinc-300 px-3 py-1 text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed dark:border-zinc-700"
-                        onClick={handleRunValidation}
-                      >
-                        {isRunning ? <svg className="h-4 w-4 animate-spin text-amber-600" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="4" stroke="currentColor" strokeDasharray="31.4 31.4" fill="none" /></svg> : null}
-                        {isRunning ? "Validating" : "Run validation"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <aside className={`${panelClass} sticky top-20 h-fit`}>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500 dark:text-zinc-400">Current status</p>
-          <p className="mt-2 text-lg font-semibold">{currentBusyCopy.label}</p>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{currentBusyCopy.description}</p>
-          <div className="mt-3 rounded-2xl bg-zinc-100 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">Next: {nextStepMessage}</div>
-          <div className="mt-4 border-t pt-3 text-sm">
-            <h3 className="font-medium">Active data</h3>
-            {!activeDataset ? (
-              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">No dataset loaded yet.</p>
-            ) : (
-              <dl className="mt-2 space-y-2 text-sm">
-                <div className="flex justify-between gap-3">
-                  <dt className="text-zinc-500">Rows</dt>
-                  <dd className="font-medium">{activeDataset.rows}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-zinc-500">Descriptors</dt>
-                  <dd className="font-medium">{activeDataset.descriptors}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-zinc-500">Source</dt>
-                  <dd className="font-medium capitalize">{activeDataset.source}</dd>
-                </div>
-              </dl>
-            )}
-          </div>
-        </aside>
-      </div>
-
       {error ? (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
           {error}
         </div>
       ) : null}
 
       {busyState !== "idle" ? (
-        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-          {currentBusyCopy.label} is in progress. Keep the current files and settings in place until the step completes.
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100 flex items-center gap-3">
+          <svg className="h-5 w-5 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="10" strokeWidth="2" strokeDasharray="31.4 31.4" />
+          </svg>
+          <div>
+            <p className="font-medium">{currentBusyCopy.label}</p>
+            <p className="text-xs">{currentBusyCopy.description}</p>
+          </div>
         </div>
       ) : null}
 
-      <main className="grid gap-4 lg:grid-cols-3">
-        <section className={`${panelClass} lg:col-span-2`}>
-          <h2 className="text-lg font-medium">1. Load matrix and vector</h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-            Start here. The mock backend uses the selected file names to build a dataset profile, so both inputs are required before any other step becomes meaningful.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">
-              <span className="mb-1 block font-medium">X matrix (.csv)</span>
-              <input
-                type="file"
-                accept=".csv"
-                className="block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                onChange={(event) =>
-                  setMatrixFile(event.target.files?.[0] ?? null)
-                }
-              />
-              <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">
-                Selected: {matrixFileName || "no file yet"}
-              </span>
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block font-medium">y vector (.csv)</span>
-              <input
-                type="file"
-                accept=".csv"
-                className="block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                onChange={(event) =>
-                  setVectorFile(event.target.files?.[0] ?? null)
-                }
-              />
-              <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">
-                Selected: {vectorFileName || "no file yet"}
-              </span>
-            </label>
+      <div className="mb-8 rounded-lg border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-900/30 dark:bg-indigo-950/20">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">Current status</p>
+            <p className="mt-1 text-base font-semibold text-indigo-700 dark:text-indigo-300">{currentBusyCopy.label}</p>
           </div>
-          <button
-            type="button"
-            disabled={busyState !== "idle"}
-            className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-            onClick={handleLoadData}
-          >
-              {busyState === "loading-data" ? "Loading dataset..." : "Load dataset and unlock preprocessing"}
-          </button>
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            You can also jump straight to the full pipeline once both files are selected.
-          </p>
-        </section>
-
-
-
-        <section className={`${panelClass} lg:col-span-2`}>
-          <h2 className="text-lg font-medium">2. Descriptor preprocessing</h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-            Use these controls to reduce noisy descriptors and prepare the active matrix for model selection.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <NumberField
-              label="Variance cut"
-              value={filterSettings.varCut}
-              min={0}
-              max={1}
-              step={0.01}
-              onChange={(value) =>
-                setFilterSettings((prev) => ({ ...prev, varCut: value }))
-              }
-            />
-            <NumberField
-              label="Correlation cut"
-              value={filterSettings.corrCut}
-              min={0}
-              max={1}
-              step={0.01}
-              onChange={(value) =>
-                setFilterSettings((prev) => ({ ...prev, corrCut: value }))
-              }
-            />
-            <NumberField
-              label="Autocorrelation cut"
-              value={filterSettings.autocorrCut}
-              min={0}
-              max={1}
-              step={0.01}
-              onChange={(value) =>
-                setFilterSettings((prev) => ({ ...prev, autocorrCut: value }))
-              }
-            />
+          <div className="rounded-lg bg-indigo-100 px-3 py-2 text-sm text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+            {nextStepMessage}
           </div>
-          <div className="mt-3 flex flex-wrap gap-4 text-sm">
-            <Switch
-              label="Autoscale"
-              checked={filterSettings.autoscale}
-              onChange={(checked) =>
-                setFilterSettings((prev) => ({ ...prev, autoscale: checked }))
-              }
-            />
-            <Switch
-              label="LJ transform"
-              checked={filterSettings.ljTransform}
-              onChange={(checked) =>
-                setFilterSettings((prev) => ({ ...prev, ljTransform: checked }))
-              }
-            />
-          </div>
-          <button
-            type="button"
-            disabled={!canRunFilters}
-            className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700"
-            onClick={handleRunFilters}
-          >
-            {busyState === "filtering" ? "Filtering..." : "Apply filters to the active matrix"}
-          </button>
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            Disabled until a dataset is loaded.
-          </p>
-        </section>
+        </div>
+      </div>
 
+      <main className="space-y-6">
+
+        {/* Step 1: Load Data */}
         <section className={panelClass}>
-          <h2 className="text-lg font-medium">3. Selection method</h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-            Choose the selection strategy, then tune only the settings that belong to that method.
-          </p>
-          <fieldset className="mt-3 flex gap-3 text-sm">
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                checked={selectionSettings.method === "ops"}
-                onChange={() => setSelectionSettings((prev) => ({ ...prev, method: "ops" }))}
-              />
-              OPS
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                name="method"
-                checked={selectionSettings.method === "ga"}
-                onChange={() => setSelectionSettings((prev) => ({ ...prev, method: "ga" }))}
-              />
-              GA
-            </label>
-          </fieldset>
-
-          <div className="mt-3 space-y-2">
-            <NumberField
-              label="Latent vars (model)"
-              value={selectionSettings.latentVarsModel}
-              min={1}
-              max={30}
-              step={1}
-              onChange={(value) =>
-                setSelectionSettings((prev) => ({ ...prev, latentVarsModel: value }))
-              }
-            />
-            {selectionSettings.method === "ops" ? (
-              <>
-                <NumberField
-                  label="Latent vars (OPS)"
-                  value={selectionSettings.latentVarsOps}
-                  min={1}
-                  max={20}
-                  step={1}
-                  onChange={(value) =>
-                    setSelectionSettings((prev) => ({ ...prev, latentVarsOps: value }))
-                  }
-                />
-                <NumberField
-                  label="Variables percentage"
-                  value={selectionSettings.varsPercentage}
-                  min={1}
-                  max={60}
-                  step={1}
-                  onChange={(value) =>
-                    setSelectionSettings((prev) => ({ ...prev, varsPercentage: value }))
-                  }
-                />
-              </>
-            ) : (
-              <>
-                <NumberField
-                  label="Min vars/model"
-                  value={selectionSettings.minVarsModel}
-                  min={1}
-                  max={50}
-                  step={1}
-                  onChange={(value) =>
-                    setSelectionSettings((prev) => ({ ...prev, minVarsModel: value }))
-                  }
-                />
-                <NumberField
-                  label="Max vars/model"
-                  value={selectionSettings.maxVarsModel}
-                  min={2}
-                  max={200}
-                  step={1}
-                  onChange={(value) =>
-                    setSelectionSettings((prev) => ({ ...prev, maxVarsModel: value }))
-                  }
-                />
-                <NumberField
-                  label="Population size"
-                  value={selectionSettings.populationSize}
-                  min={20}
-                  max={300}
-                  step={1}
-                  onChange={(value) =>
-                    setSelectionSettings((prev) => ({ ...prev, populationSize: value }))
-                  }
-                />
-                <NumberField
-                  label="Generations"
-                  value={selectionSettings.generations}
-                  min={10}
-                  max={500}
-                  step={1}
-                  onChange={(value) =>
-                    setSelectionSettings((prev) => ({ ...prev, generations: value }))
-                  }
-                />
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            disabled={!canRunSelection}
-            className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700"
-            onClick={handleRunSelection}
-          >
-            {busyState === "selecting" ? "Selecting..." : "Run variable selection on the active matrix"}
-          </button>
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            Disabled until preprocessing has produced an active dataset.
-          </p>
-        </section>
-
-        <section className={`${panelClass} lg:col-span-2`}>
-          <h2 className="text-lg font-medium">4. Validation suite</h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-            Run whichever checks you need. These metrics show whether the selected model is stable enough to trust.
-          </p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Switch
-              label="Cross validation"
-              checked={validationSettings.runCrossValidation}
-              onChange={(checked) =>
-                setValidationSettings((prev) => ({ ...prev, runCrossValidation: checked }))
-              }
-            />
-            <Switch
-              label="Y-randomization"
-              checked={validationSettings.runYRandomization}
-              onChange={(checked) =>
-                setValidationSettings((prev) => ({ ...prev, runYRandomization: checked }))
-              }
-            />
-            <Switch
-              label="Leave-N-Out"
-              checked={validationSettings.runLNO}
-              onChange={(checked) =>
-                setValidationSettings((prev) => ({ ...prev, runLNO: checked }))
-              }
-            />
-            <Switch
-              label="External validation"
-              checked={validationSettings.runExternalValidation}
-              onChange={(checked) =>
-                setValidationSettings((prev) => ({ ...prev, runExternalValidation: checked }))
-              }
-            />
-          </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <NumberField
-              label="Y-rand cutoff"
-              value={validationSettings.yrandCutoff}
-              min={0}
-              max={1}
-              step={0.01}
-              onChange={(value) =>
-                setValidationSettings((prev) => ({ ...prev, yrandCutoff: value }))
-              }
-            />
-            <NumberField
-              label="LNO cutoff"
-              value={validationSettings.lnoCutoff}
-              min={0}
-              max={1}
-              step={0.01}
-              onChange={(value) =>
-                setValidationSettings((prev) => ({ ...prev, lnoCutoff: value }))
-              }
-            />
-            <NumberField
-              label="Test set ratio"
-              value={validationSettings.testSetRatio}
-              min={0.1}
-              max={0.5}
-              step={0.01}
-              onChange={(value) =>
-                setValidationSettings((prev) => ({ ...prev, testSetRatio: value }))
-              }
-            />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={!canRunValidation}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700"
-              onClick={handleRunValidation}
-            >
-              {busyState === "validating" ? "Validating..." : "Run validations for the selected model"}
-            </button>
-            <button
-              type="button"
-              disabled={!canRunPipeline}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={handleRunPipeline}
-            >
-              Run the full pipeline
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            Full pipeline mode loads data, applies preprocessing, runs selection, and finishes with validation in one pass.
-          </p>
-        </section>
-
-        <section className={panelClass}>
-          <h2 className="text-lg font-medium">Results</h2>
-          {!selectionResult ? (
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
-              Selection metrics will appear here after you run OPS or GA.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-2 text-sm">
-              <Metric label="Method" value={selectionResult.method.toUpperCase()} />
-              <Metric label="Selected descriptors" value={selectionResult.selectedDescriptors} />
-              <Metric label="Latent variables" value={selectionResult.latentVariables} />
-              <Metric label="Q²" value={selectionResult.q2.toFixed(3)} />
-              <Metric label="R²" value={selectionResult.r2.toFixed(3)} />
-              <Metric
-                label="Package checks"
-                value={selectionResult.validationPassed ? "Passed" : "Did not pass"}
-              />
-            </div>
-          )}
-          {validationResult ? (
-            <div className="mt-4 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
-              <h3 className="mb-2 font-medium">Validation output</h3>
-              <div className="space-y-2">
-                {validationResult.cv ? (
-                  <Metric
-                    label="Cross validation"
-                    value={`Q² ${validationResult.cv.q2.toFixed(3)}, RMSE ${validationResult.cv.rmse}`}
-                  />
-                ) : null}
-                {validationResult.yr ? (
-                  <Metric
-                    label="Y-randomization"
-                    value={`${validationResult.yr.score.toFixed(3)} (${validationResult.yr.passed ? "pass" : "fail"})`}
-                  />
-                ) : null}
-                {validationResult.lno ? (
-                  <Metric
-                    label="LNO"
-                    value={`${validationResult.lno.score.toFixed(3)} (${validationResult.lno.passed ? "pass" : "fail"})`}
-                  />
-                ) : null}
-                {validationResult.ext ? (
-                  <Metric
-                    label="External validation"
-                    value={`R²pred ${validationResult.ext.r2Pred.toFixed(3)}, RMSEP ${validationResult.ext.rmsep}`}
-                  />
-                ) : null}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/40">
+                <span className="font-semibold text-indigo-700 dark:text-indigo-300">1</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Load your data</h2>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Upload CSV files for the descriptor matrix (X) and target variable (y)</p>
               </div>
             </div>
+            {uploadedDataset ? (
+              <svg className="h-6 w-6 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : null}
+          </div>
+
+          {uploadedDataset ? null : (
+            <>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="text-sm">
+                  <span className="mb-2 block font-medium">X matrix (.csv)</span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                    onChange={(event) =>
+                      setMatrixFile(event.target.files?.[0] ?? null)
+                    }
+                  />
+                  <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">
+                    {matrixFileName || "No file selected"}
+                  </span>
+                </label>
+                <label className="text-sm">
+                  <span className="mb-2 block font-medium">y vector (.csv)</span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                    onChange={(event) =>
+                      setVectorFile(event.target.files?.[0] ?? null)
+                    }
+                  />
+                  <span className="mt-2 block text-xs text-zinc-500 dark:text-zinc-400">
+                    {vectorFileName || "No file selected"}
+                  </span>
+                </label>
+              </div>
+              <button
+                type="button"
+                disabled={!canLoadData}
+                className="mt-4 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-700"
+                onClick={handleLoadData}
+              >
+                {busyState === "loading-data" ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="12" cy="12" r="10" strokeWidth="2" strokeDasharray="31.4 31.4" />
+                    </svg>
+                    Loading dataset...
+                  </>
+                ) : (
+                  "Load dataset"
+                )}
+              </button>
+            </>
+          )}
+
+          {uploadedDataset ? (
+            <ResultCard title="Dataset loaded successfully">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Rows:</span>
+                  <p className="font-semibold">{uploadedDataset.rows}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Descriptors:</span>
+                  <p className="font-semibold">{uploadedDataset.descriptors}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Files:</span>
+                  <p className="text-xs font-semibold">{uploadedDataset.matrixName}, {uploadedDataset.vectorName}</p>
+                </div>
+              </div>
+            </ResultCard>
           ) : null}
         </section>
 
-        <section className={`${panelClass} lg:col-span-3`}>
-          <h2 className="text-lg font-medium">Workflow timeline</h2>
-          {timeline.length === 0 ? (
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
-              Start by loading data to build your run history. Each action will be added here as a compact audit trail.
-            </p>
+        {/* Step 2: Preprocessing */}
+        <section className={`${panelClass} ${!uploadedDataset ? "opacity-50" : ""}`}>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/40">
+                <span className="font-semibold text-indigo-700 dark:text-indigo-300">2</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Filter descriptors</h2>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Remove noisy variables before model selection</p>
+              </div>
+            </div>
+            {activeDataset?.source === "filtered" ? (
+              <svg className="h-6 w-6 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : null}
+          </div>
+
+          {uploadedDataset ? (
+            <>
+              <div className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900/30">
+                <p className="text-sm font-medium mb-3">Basic settings (recommended for most datasets)</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <NumberFieldWithTooltip
+                    label="Variance cut"
+                    help="Removes descriptors with low variance across samples. Higher values filter more aggressively."
+                    value={filterSettings.varCut}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={(value) =>
+                      setFilterSettings((prev) => ({ ...prev, varCut: value }))
+                    }
+                  />
+                  <NumberFieldWithTooltip
+                    label="Correlation cut"
+                    help="Removes highly correlated descriptors to reduce multicollinearity. Higher values filter more aggressively."
+                    value={filterSettings.corrCut}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={(value) =>
+                      setFilterSettings((prev) => ({ ...prev, corrCut: value }))
+                    }
+                  />
+                  <NumberFieldWithTooltip
+                    label="Autocorrelation cut"
+                    help="Removes descriptors with high autocorrelation within themselves. Lower values filter more aggressively."
+                    value={filterSettings.autocorrCut}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={(value) =>
+                      setFilterSettings((prev) => ({ ...prev, autocorrCut: value }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <ExpandableSection title="Fine-tune settings">
+                <div className="space-y-3">
+                  <label className="inline-flex items-center gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800">
+                    <input
+                      type="checkbox"
+                      checked={filterSettings.autoscale}
+                      onChange={(event) =>
+                        setFilterSettings((prev) => ({ ...prev, autoscale: event.target.checked }))
+                      }
+                    />
+                    <span>
+                      <span className="font-medium">Autoscale</span>
+                      <span className="text-zinc-500 dark:text-zinc-400 ml-1">(mean-center and scale to unit variance)</span>
+                    </span>
+                  </label>
+                  <label className="inline-flex items-center gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800">
+                    <input
+                      type="checkbox"
+                      checked={filterSettings.ljTransform}
+                      onChange={(event) =>
+                        setFilterSettings((prev) => ({ ...prev, ljTransform: event.target.checked }))
+                      }
+                    />
+                    <span>
+                      <span className="font-medium">LJ transform</span>
+                      <span className="text-zinc-500 dark:text-zinc-400 ml-1">(apply Lennard-Jones descriptor transformation)</span>
+                    </span>
+                  </label>
+                </div>
+              </ExpandableSection>
+
+              <button
+                type="button"
+                disabled={!canRunFilters}
+                className="mt-4 flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700"
+                onClick={handleRunFilters}
+              >
+                {busyState === "filtering" ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="12" cy="12" r="10" strokeWidth="2" strokeDasharray="31.4 31.4" />
+                    </svg>
+                    Applying filters...
+                  </>
+                ) : (
+                  "Apply filters"
+                )}
+              </button>
+            </>
           ) : (
-            <ul className="mt-3 space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">Load a dataset first to enable filtering.</p>
+          )}
+
+          {activeDataset?.source === "filtered" ? (
+            <ResultCard title="Filters applied successfully">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Active descriptors:</span>
+                  <p className="font-semibold">{activeDataset.descriptors}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Removed:</span>
+                  <p className="font-semibold">{uploadedDataset ? uploadedDataset.descriptors - activeDataset.descriptors : 0}</p>
+                </div>
+              </div>
+            </ResultCard>
+          ) : null}
+        </section>
+
+        {/* Step 3: Selection */}
+        <section className={`${panelClass} ${!activeDataset ? "opacity-50" : ""}`}>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/40">
+                <span className="font-semibold text-indigo-700 dark:text-indigo-300">3</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Select variables</h2>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Choose the best subset of descriptors for your model</p>
+              </div>
+            </div>
+            {selectionResult ? (
+              <svg className="h-6 w-6 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : null}
+          </div>
+
+          {activeDataset ? (
+            <>
+              <div className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900/30">
+                <p className="text-sm font-medium mb-3">Choose selection method</p>
+                <fieldset className="flex gap-4 text-sm">
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-300 dark:border-zinc-800 dark:has-[:checked]:bg-indigo-950/30 dark:has-[:checked]:border-indigo-700">
+                    <input
+                      type="radio"
+                      checked={selectionSettings.method === "ops"}
+                      onChange={() => setSelectionSettings((prev) => ({ ...prev, method: "ops" }))}
+                    />
+                    <span>
+                      <span className="font-medium">OPS</span>
+                      <span className="text-zinc-500 dark:text-zinc-400 ml-1 text-xs">(Orthogonal Projections to Latent Structures)</span>
+                    </span>
+                  </label>
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-300 dark:border-zinc-800 dark:has-[:checked]:bg-indigo-950/30 dark:has-[:checked]:border-indigo-700">
+                    <input
+                      type="radio"
+                      name="method"
+                      checked={selectionSettings.method === "ga"}
+                      onChange={() => setSelectionSettings((prev) => ({ ...prev, method: "ga" }))}
+                    />
+                    <span>
+                      <span className="font-medium">GA</span>
+                      <span className="text-zinc-500 dark:text-zinc-400 ml-1 text-xs">(Genetic Algorithm)</span>
+                    </span>
+                  </label>
+                </fieldset>
+              </div>
+
+              <div className="mt-4 rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900/30">
+                <p className="text-sm font-medium mb-3">Basic settings</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <NumberFieldWithTooltip
+                    label="Latent variables (model)"
+                    help="Number of latent variables (PLS components) in the final model. Higher values provide better quality with longer calculations."
+                    value={selectionSettings.latentVarsModel}
+                    min={1}
+                    max={30}
+                    step={1}
+                    onChange={(value) =>
+                      setSelectionSettings((prev) => ({ ...prev, latentVarsModel: value }))
+                    }
+                  />
+                  {selectionSettings.method === "ops" ? (
+                    <NumberFieldWithTooltip
+                      label="Latent variables (OPS)"
+                      help="Number of latent variables used during OPS selection process. Higher values increase computational cost but may improve robustness."
+                      value={selectionSettings.latentVarsOps}
+                      min={1}
+                      max={20}
+                      step={1}
+                      onChange={(value) =>
+                        setSelectionSettings((prev) => ({ ...prev, latentVarsOps: value }))
+                      }
+                    />
+                  ) : null}
+                </div>
+              </div>
+
+              <ExpandableSection title={`${selectionSettings.method === "ops" ? "OPS" : "GA"} fine-tuning`}>
+                <div className="space-y-3">
+                  {selectionSettings.method === "ops" ? (
+                    <>
+                      <NumberFieldWithTooltip
+                        label="Variables percentage"
+                        help="Percentage of descriptors to evaluate during OPS selection. Lower values reduce search space but may miss optimal features."
+                        value={selectionSettings.varsPercentage}
+                        min={1}
+                        max={60}
+                        step={1}
+                        onChange={(value) =>
+                          setSelectionSettings((prev) => ({ ...prev, varsPercentage: value }))
+                        }
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <NumberFieldWithTooltip
+                        label="Min vars per model"
+                        help="Minimum number of descriptors in any candidate model. Higher values create more complex models but reduce overfitting risk."
+                        value={selectionSettings.minVarsModel}
+                        min={1}
+                        max={50}
+                        step={1}
+                        onChange={(value) =>
+                          setSelectionSettings((prev) => ({ ...prev, minVarsModel: value }))
+                        }
+                      />
+                      <NumberFieldWithTooltip
+                        label="Max vars per model"
+                        help="Maximum number of descriptors in any candidate model. Lower values favor simpler models; higher values allow more complex solutions."
+                        value={selectionSettings.maxVarsModel}
+                        min={2}
+                        max={200}
+                        step={1}
+                        onChange={(value) =>
+                          setSelectionSettings((prev) => ({ ...prev, maxVarsModel: value }))
+                        }
+                      />
+                      <NumberFieldWithTooltip
+                        label="Population size"
+                        help="Number of models in each generation of the genetic algorithm. Larger populations explore the search space better but increase computation time."
+                        value={selectionSettings.populationSize}
+                        min={20}
+                        max={300}
+                        step={1}
+                        onChange={(value) =>
+                          setSelectionSettings((prev) => ({ ...prev, populationSize: value }))
+                        }
+                      />
+                      <NumberFieldWithTooltip
+                        label="Generations"
+                        help="Number of generations to evolve in the genetic algorithm. More generations improve convergence but require longer computation."
+                        value={selectionSettings.generations}
+                        min={10}
+                        max={500}
+                        step={1}
+                        onChange={(value) =>
+                          setSelectionSettings((prev) => ({ ...prev, generations: value }))
+                        }
+                      />
+                    </>
+                  )}
+                </div>
+              </ExpandableSection>
+
+              <button
+                type="button"
+                disabled={!canRunSelection}
+                className="mt-4 flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700"
+                onClick={handleRunSelection}
+              >
+                {busyState === "selecting" ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="12" cy="12" r="10" strokeWidth="2" strokeDasharray="31.4 31.4" />
+                    </svg>
+                    Running selection...
+                  </>
+                ) : (
+                  `Run ${selectionSettings.method.toUpperCase()}`
+                )}
+              </button>
+            </>
+          ) : (
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">Complete preprocessing first to enable variable selection.</p>
+          )}
+
+          {selectionResult ? (
+            <ResultCard title="Selection completed">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Method:</span>
+                  <p className="font-semibold">{selectionResult.method.toUpperCase()}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Descriptors:</span>
+                  <p className="font-semibold">{selectionResult.selectedDescriptors}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Q²:</span>
+                  <p className="font-semibold">{selectionResult.q2.toFixed(3)}</p>
+                </div>
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">R²:</span>
+                  <p className="font-semibold">{selectionResult.r2.toFixed(3)}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Latent variables:</span>
+                  <p className="font-semibold">{selectionResult.latentVariables}</p>
+                </div>
+              </div>
+            </ResultCard>
+          ) : null}
+        </section>
+
+        {/* Step 4: Validation */}
+        <section className={`${panelClass} ${!selectionResult ? "opacity-50" : ""}`}>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/40">
+                <span className="font-semibold text-indigo-700 dark:text-indigo-300">4</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Validate model</h2>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Run validation tests to confirm model quality and stability</p>
+              </div>
+            </div>
+            {validationResult ? (
+              <svg className="h-6 w-6 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : null}
+          </div>
+
+          {selectionResult ? (
+            <>
+              <div className="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900/30">
+                <p className="text-sm font-medium mb-3">Choose validation tests</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="inline-flex items-center gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-300 dark:border-zinc-800 dark:has-[:checked]:bg-indigo-950/30 dark:has-[:checked]:border-indigo-700">
+                    <input
+                      type="checkbox"
+                      checked={validationSettings.runCrossValidation}
+                      onChange={(event) =>
+                        setValidationSettings((prev) => ({ ...prev, runCrossValidation: event.target.checked }))
+                      }
+                    />
+                    <span className="font-medium">Cross validation</span>
+                  </label>
+                  <label className="inline-flex items-center gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-300 dark:border-zinc-800 dark:has-[:checked]:bg-indigo-950/30 dark:has-[:checked]:border-indigo-700">
+                    <input
+                      type="checkbox"
+                      checked={validationSettings.runYRandomization}
+                      onChange={(event) =>
+                        setValidationSettings((prev) => ({ ...prev, runYRandomization: event.target.checked }))
+                      }
+                    />
+                    <span className="font-medium">Y-randomization</span>
+                  </label>
+                  <label className="inline-flex items-center gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-300 dark:border-zinc-800 dark:has-[:checked]:bg-indigo-950/30 dark:has-[:checked]:border-indigo-700">
+                    <input
+                      type="checkbox"
+                      checked={validationSettings.runLNO}
+                      onChange={(event) =>
+                        setValidationSettings((prev) => ({ ...prev, runLNO: event.target.checked }))
+                      }
+                    />
+                    <span className="font-medium">Leave-N-Out</span>
+                  </label>
+                  <label className="inline-flex items-center gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:bg-indigo-50 has-[:checked]:border-indigo-300 dark:border-zinc-800 dark:has-[:checked]:bg-indigo-950/30 dark:has-[:checked]:border-indigo-700">
+                    <input
+                      type="checkbox"
+                      checked={validationSettings.runExternalValidation}
+                      onChange={(event) =>
+                        setValidationSettings((prev) => ({ ...prev, runExternalValidation: event.target.checked }))
+                      }
+                    />
+                    <span className="font-medium">External validation</span>
+                  </label>
+                </div>
+              </div>
+
+              <ExpandableSection title="Fine-tune thresholds">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <NumberFieldWithTooltip
+                    label="Y-rand cutoff"
+                    help="Threshold for Y-randomization test. Models above this are likely overfit."
+                    value={validationSettings.yrandCutoff}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={(value) =>
+                      setValidationSettings((prev) => ({ ...prev, yrandCutoff: value }))
+                    }
+                  />
+                  <NumberFieldWithTooltip
+                    label="LNO cutoff"
+                    help="Threshold for Leave-N-Out test. Lower values are stricter; higher values accept more variation."
+                    value={validationSettings.lnoCutoff}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={(value) =>
+                      setValidationSettings((prev) => ({ ...prev, lnoCutoff: value }))
+                    }
+                  />
+                  <NumberFieldWithTooltip
+                    label="Test set ratio"
+                    help="Fraction of data to use for external validation."
+                    value={validationSettings.testSetRatio}
+                    min={0.1}
+                    max={0.5}
+                    step={0.01}
+                    onChange={(value) =>
+                      setValidationSettings((prev) => ({ ...prev, testSetRatio: value }))
+                    }
+                  />
+                </div>
+              </ExpandableSection>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={!canRunValidation}
+                  className="flex items-center gap-2 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700"
+                  onClick={handleRunValidation}
+                >
+                  {busyState === "validating" ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="10" strokeWidth="2" strokeDasharray="31.4 31.4" />
+                      </svg>
+                      Running validation...
+                    </>
+                  ) : (
+                    "Run validation"
+                  )}
+                </button>
+                <button
+                  type="button"
+                  disabled={!canRunPipeline}
+                  className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-amber-700"
+                  onClick={handleRunPipeline}
+                >
+                  {busyState !== "idle" ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="10" strokeWidth="2" strokeDasharray="31.4 31.4" />
+                      </svg>
+                      Running full pipeline...
+                    </>
+                  ) : (
+                    "▶ Run full pipeline"
+                  )}
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">Complete variable selection first to enable validation.</p>
+          )}
+
+          {validationResult ? (
+            <ResultCard title="Validation completed">
+              <div className="space-y-2">
+                {validationResult.cv ? (
+                  <div className="flex justify-between">
+                    <span>Cross validation Q²:</span>
+                    <span className="font-semibold">{validationResult.cv.q2.toFixed(3)}</span>
+                  </div>
+                ) : null}
+                {validationResult.yr ? (
+                  <div className="flex justify-between">
+                    <span>Y-randomization:</span>
+                    <span className={`font-semibold ${validationResult.yr.passed ? "text-green-600" : "text-red-600"}`}>
+                      {validationResult.yr.score.toFixed(3)} {validationResult.yr.passed ? "✓ PASS" : "✗ FAIL"}
+                    </span>
+                  </div>
+                ) : null}
+                {validationResult.lno ? (
+                  <div className="flex justify-between">
+                    <span>Leave-N-Out:</span>
+                    <span className={`font-semibold ${validationResult.lno.passed ? "text-green-600" : "text-red-600"}`}>
+                      {validationResult.lno.score.toFixed(3)} {validationResult.lno.passed ? "✓ PASS" : "✗ FAIL"}
+                    </span>
+                  </div>
+                ) : null}
+                {validationResult.ext ? (
+                  <div className="flex justify-between">
+                    <span>External validation R²pred:</span>
+                    <span className="font-semibold">{validationResult.ext.r2Pred.toFixed(3)}</span>
+                  </div>
+                ) : null}
+              </div>
+            </ResultCard>
+          ) : null}
+        </section>
+
+        {/* Workflow Timeline */}
+        {timeline.length > 0 ? (
+          <section className={panelClass}>
+            <h2 className="text-lg font-semibold">Workflow history</h2>
+            <ul className="mt-4 space-y-2 text-sm text-zinc-700 dark:text-zinc-300 font-mono">
               {timeline.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item} className="text-xs">{item}</li>
               ))}
             </ul>
-          )}
-        </section>
+          </section>
+        ) : null}
       </main>
     </div>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-zinc-500">{label}</span>
-      <span className="font-medium">{value}</span>
-    </div>
-  );
-}
-
-function Switch({
+// Helper component with tooltip
+function NumberFieldWithTooltip({
   label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      {label}
-    </label>
-  );
-}
-
-function NumberField({
-  label,
+  help,
   value,
   min,
   max,
@@ -896,6 +1006,7 @@ function NumberField({
   onChange,
 }: {
   label: string;
+  help: string;
   value: number;
   min: number;
   max: number;
@@ -904,14 +1015,17 @@ function NumberField({
 }) {
   return (
     <label className="text-sm">
-      <span className="mb-1 block font-medium">{label}</span>
+      <div className="mb-2 flex items-center gap-2">
+        <span className="font-medium">{label}</span>
+        <Tooltip text={help} />
+      </div>
       <input
         type="number"
         value={value}
         min={min}
         max={max}
         step={step}
-        className="w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+        className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         onChange={(event) => onChange(Number(event.target.value))}
       />
     </label>
