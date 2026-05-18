@@ -28,3 +28,30 @@ O usuário poderia:
 - Gerar o modelo completo
 - Rodar as validações
 - Visualizar os resultados
+
+## Desenvolvimento
+
+Atualmente, o frontend (`apps/frontend`) é Next.js e o backend (`apps/backend`) é Python/FastAPI. A escolha por Python no backend se deve à biblioteca `qsarmodelingpy` que implementa os cálculos em `numpy`, `pandas` e `scikit-learn`.
+
+De qualquer forma, as dependências são:
+
+- Node v24
+- [`uv`](https://astral.sh/uv)
+
+1. Instale o `pnpm` e o `turbo`:
+```bash
+npm i -g pnpm turbo
+```
+2. Instale as dependências
+```bash
+pnpm install
+```
+3. Rode o script `dev`:
+```bash
+pnpm run dev
+
+# equivale a:
+turbo run dev
+```
+
+Isso executará simultaneamente o backend e o frontend.

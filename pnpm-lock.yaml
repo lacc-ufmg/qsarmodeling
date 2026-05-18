@@ -18,6 +18,8 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
+  apps/backend: {}
+
   apps/frontend:
     dependencies:
       next:
@@ -45,6 +47,9 @@ importers:
       babel-plugin-react-compiler:
         specifier: 1.0.0
         version: 1.0.0
+      backend:
+        specifier: workspace:*
+        version: link:../backend
       eslint:
         specifier: ^9
         version: 9.39.4(jiti@2.7.0)
