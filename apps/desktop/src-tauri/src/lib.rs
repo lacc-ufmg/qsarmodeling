@@ -1,14 +1,27 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use serde::Serialize;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppInfo {
+    app_name: String,
+    platform: String,
+    version: String,
+}
+
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+fn app_info() -> AppInfo {
+    AppInfo {
+        app_name: env!("CARGO_PKG_NAME").to_string(),
+        platform: std::env::consts::OS.to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![app_info])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
