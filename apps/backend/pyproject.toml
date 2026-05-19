@@ -9,9 +9,6 @@ dependencies = [
     "httpx>=0.28.1",
     "pyinstaller>=6.20.0",
     "python-multipart>=0.0.29",
-    "qsarmodelingpy",
+    "qsarmodelingpy>=0.4.2",
     "uvicorn>=0.47.0",
 ]
-
-[tool.uv.sources]
-qsarmodelingpy = { git = "https://github.com/hellmrf/QSARModelingPy" }
