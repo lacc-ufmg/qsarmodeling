@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import multiprocessing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional
@@ -12,6 +13,7 @@ import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from uvicorn import run
 
 from qsarmodelingpy.utils import load_matrix
 from qsarmodelingpy.models.ga import Ga
@@ -479,3 +481,7 @@ def run_pipeline(session_id: str, payload: PipelineRequest) -> dict:
         "selection": selection,
         "validation": validation,
     }
+
+if __name__ == '__main__':
+    multiprocessing.freeze_support()  # For Windows support
+    run(app, host="0.0.0.0", port=27051, reload=False, workers=1)
