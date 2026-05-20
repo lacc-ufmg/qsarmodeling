@@ -42,7 +42,6 @@
     "copyright": "Copyright © 2026 Heliton Martins. All rights reserved.",
     "publisher": "LACC-UFMG",
     "homepage": "https://github.com/hellmrf/qsarkit",
-    "licenseFile": "LICENSE",
     "externalBin": [
       "binaries/qsar-backend"
     ],
