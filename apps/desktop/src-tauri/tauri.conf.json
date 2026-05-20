@@ -66,10 +66,6 @@
       "nsis": {
         "headerImage": null,
         "sidebarImage": null,
-        "languages": [
-          "en-US",
-          "pt-BR"
-        ],
         "displayLanguageSelector": false,
         "installerIcon": "icons/icon.ico",
         "installMode": "currentUser"
