@@ -6,7 +6,7 @@
       "dependsOn": ["frontend#build", "sync-sidecar"],
       "inputs": ["$TURBO_DEFAULT$", "src-tauri/**"],
       "outputs": ["src-tauri/target/release/**", "$TURBO_ROOT$/target/release/**"],
-      "cache": true
+      "cache": false
     },
     "sync-sidecar": {
       "dependsOn": ["backend#build"],

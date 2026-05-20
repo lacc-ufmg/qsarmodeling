@@ -1,8 +1,8 @@
 use serde::Serialize;
 use std::sync::Mutex;
 use tauri::Manager;
-use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::ShellExt;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,14 +27,16 @@ fn app_info() -> AppInfo {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app = tauri::Builder::default()
+    let _ = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(SidecarState {
             child_pid: Mutex::new(None),
         })
         .setup(|app| {
-            let sidecar_command = app.shell().sidecar("qsar-backend")
+            let sidecar_command = app
+                .shell()
+                .sidecar("qsar-backend")
                 .expect("failed to create `qsar-backend` sidecar configuration");
 
             let (mut rx, child) = sidecar_command
@@ -67,27 +69,26 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![app_info])
         .build(tauri::generate_context!())
-        .expect("error while running tauri application");
-
-    app.run(|app_handle, event| {
-        if let tauri::RunEvent::ExitRequested { .. } = event {
-            // Kill the sidecar process when the app exits
-            if let Ok(mut state) = app_handle.state::<SidecarState>().child_pid.lock() {
-                if let Some(child_pid) = state.take() {
-                    #[cfg(unix)]
-                    {
-                        let _ = std::process::Command::new("kill")
-                            .arg(child_pid.to_string())
-                            .output();
-                    }
-                    #[cfg(windows)]
-                    {
-                        let _ = std::process::Command::new("taskkill")
-                            .args(["/PID", &child_pid.to_string(), "/F"])
-                            .output();
+        .expect("error while running tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                // Kill the sidecar process when the app exits
+                if let Ok(mut state) = app_handle.state::<SidecarState>().child_pid.lock() {
+                    if let Some(child_pid) = state.take() {
+                        #[cfg(unix)]
+                        {
+                            let _ = std::process::Command::new("kill")
+                                .arg(child_pid.to_string())
+                                .output();
+                        }
+                        #[cfg(windows)]
+                        {
+                            let _ = std::process::Command::new("taskkill")
+                                .args(["/PID", &child_pid.to_string(), "/F"])
+                                .output();
+                        }
                     }
                 }
             }
-        }
-    });
+        });
 }
