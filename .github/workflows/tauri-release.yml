@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - dev/desktop
+      - main
 
 # This workflow will trigger on each push to the `release` branch to create or update a GitHub release, build your app, and upload the artifacts to the release.
 
@@ -44,6 +45,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Habilitar caminhos longos no Git do Windows
+        if: matrix.platform == 'windows-latest'
+        run: git config --system core.longpaths true
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'

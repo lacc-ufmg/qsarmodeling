@@ -35,7 +35,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["appimage", "deb", "msi", "nsis"],
+    "targets": ["appimage", "deb", "nsis"],
     "category": "Utility",
     "shortDescription": "Quantitative Structure–Activity Relationship modelling",
     "longDescription": "QSAR Modeling allows researchers to build, evaluate and apply QSAR/QSPR models for molecular property prediction. All data stays local.",
@@ -68,14 +68,13 @@
         "headerImage": null,
         "sidebarImage": null,
         "languages": [
-          "English",
-          "Portuguese"
+          "en-US",
+          "pt-BR"
         ],
         "displayLanguageSelector": false,
         "installerIcon": "icons/icon.ico",
         "installMode": "currentUser"
-      },
-      "wix": null
+      }
     }
   }
 }
