@@ -3,6 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "build": {
+      "dependsOn": ["uvsync"],
       "inputs": ["$TURBO_DEFAULT$", "app.py", "pyproject.toml", "uv.lock"],
       "cache": true,
       "outputs": ["dist/*"],
@@ -10,6 +11,11 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "uvsync": {
+      "inputs": ["pyproject.toml", "uv.lock"],
+      "cache": false,
+      "outputs": [".venv/*"],
     }
   }
 }

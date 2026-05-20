@@ -4,6 +4,6 @@
   "scripts": {
     "dev": "uv run uvicorn app:app --reload --host 127.0.0.1 --port 27051",
     "build": "uv run pyinstaller app.py --clean --copy-metadata moocore --onefile",
-    "uvsync": "uv sync --no-dev --locked"
+    "uvsync": "uv python install --project backend && uv sync --no-dev --locked"
   }
 }
