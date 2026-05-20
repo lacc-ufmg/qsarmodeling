@@ -484,4 +484,4 @@ def run_pipeline(session_id: str, payload: PipelineRequest) -> dict:
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()  # For Windows support
-    run(app, host="0.0.0.0", port=27051, reload=False, workers=1)
+    run(app, host="127.0.0.1", port=27051, reload=False, workers=1)

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": ["$TURBO_DEFAULT$", "app.py", "pyproject.toml", "uv.lock"],
+      "cache": true,
+      "outputs": ["dist/*"],
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": ["$TURBO_DEFAULT$", "vite.config.ts", "index.html", "src/**", "public/**"],
+      "outputs": ["dist/**"],
+      "cache": true
+    },
+    "tauri-build": {
+      "dependsOn": ["build", "sync-sidecar"],
+      "inputs": ["$TURBO_DEFAULT$", "src-tauri/**", "dist/**"],
+      "outputs": ["src-tauri/target/**"],
+      "cache": true
+    },
+    "sync-sidecar": {
+      "dependsOn": ["backend#build"],
+      "inputs": ["$TURBO_DEFAULT$", "scripts/sync-backend-sidecar.mjs"],
+      "outputs": ["src-tauri/binaries/qsar-backend*"],
+      "cache": true
+    }
+  }
+}
