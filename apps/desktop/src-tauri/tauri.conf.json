@@ -6,15 +6,15 @@
   "build": {
     "beforeDevCommand": "pnpm sync-sidecar && pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm sync-sidecar && pnpm build",
-    "frontendDist": "../dist"
+    "beforeBuildCommand": "pnpm sync-sidecar",
+    "frontendDist": "../../frontend/out"
   },
   "app": {
     "windows": [
       {
-        "title": "qsarmodeling",
-        "width": 800,
-        "height": 600
+        "title": "QSAR Modeling 2.0",
+        "width": 1200,
+        "height": 900
       }
     ],
     "security": {

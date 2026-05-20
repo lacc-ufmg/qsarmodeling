@@ -4,11 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "_dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
     "sync-sidecar": "node scripts/sync-backend-sidecar.mjs",
-    "tauri-build": "tauri build",
+    "build": "tauri build",
     "tauri": "tauri"
   },
   "dependencies": {
