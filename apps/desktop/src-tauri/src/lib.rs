@@ -1,4 +1,6 @@
 use serde::Serialize;
+use std::sync::Mutex;
+use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandEvent;
 
@@ -8,6 +10,10 @@ struct AppInfo {
     app_name: String,
     platform: String,
     version: String,
+}
+
+struct SidecarState {
+    child_pid: Mutex<Option<u32>>,
 }
 
 #[tauri::command]
@@ -21,16 +27,24 @@ fn app_info() -> AppInfo {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .manage(SidecarState {
+            child_pid: Mutex::new(None),
+        })
         .setup(|app| {
             let sidecar_command = app.shell().sidecar("qsar-backend")
                 .expect("failed to create `qsar-backend` sidecar configuration");
 
-            let (mut rx, mut _child) = sidecar_command
+            let (mut rx, child) = sidecar_command
                 .spawn()
                 .expect("Failed to spawn qsar-backend sidecar");
+
+            // Store the child process ID in app state
+            if let Ok(mut state) = app.state::<SidecarState>().child_pid.lock() {
+                *state = Some(child.pid());
+            }
 
             tauri::async_runtime::spawn(async move {
                 while let Some(event) = rx.recv().await {
@@ -52,6 +66,28 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![app_info])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { .. } = event {
+            // Kill the sidecar process when the app exits
+            if let Ok(mut state) = app_handle.state::<SidecarState>().child_pid.lock() {
+                if let Some(child_pid) = state.take() {
+                    #[cfg(unix)]
+                    {
+                        let _ = std::process::Command::new("kill")
+                            .arg(child_pid.to_string())
+                            .output();
+                    }
+                    #[cfg(windows)]
+                    {
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/PID", &child_pid.to_string(), "/F"])
+                            .output();
+                    }
+                }
+            }
+        }
+    });
 }
