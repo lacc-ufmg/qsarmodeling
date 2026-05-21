@@ -1,12 +1,5 @@
 {
   "servers": {
-    "next-devtools": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "next-devtools-mcp@latest"
-      ]
-    },
     "tailwindcss-server": {
       "command": "npx",
       "args": [
@@ -15,21 +8,9 @@
       ],
       "type": "stdio"
     },
-    "heroui-react": {
-      "type": "stdio",
+    "mantine": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@heroui/react-mcp@latest"
-      ]
-    },
-    "shadcn": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "shadcn@latest",
-        "mcp"
-      ]
+      "args": ["-y", "@mantine/mcp-server"]
     }
   }
 }
