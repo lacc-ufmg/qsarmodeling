@@ -41,7 +41,7 @@
     "longDescription": "QSAR Modeling allows researchers to build, evaluate and apply QSAR/QSPR models for molecular property prediction. All data stays local.",
     "copyright": "Copyright © 2026 Heliton Martins. All rights reserved.",
     "publisher": "LACC-UFMG",
-    "homepage": "https://github.com/hellmrf/qsarkit",
+    "homepage": "https://github.com/hellmrf/qsarmodeling",
     "externalBin": [
       "binaries/qsar-backend"
     ],

@@ -318,7 +318,7 @@ async def load_dataset(
     if not matrix_file.filename or not vector_file.filename:
         raise HTTPException(status_code=400, detail="Both matrix and vector files are required.")
     session_id = uuid4().hex
-    session_dir = Path("/tmp") / f"qsarkit-{session_id}"
+    session_dir = Path("/tmp") / f"qsarmodeling-{session_id}"
     session_dir.mkdir(parents=True, exist_ok=True)
 
     matrix_path = _load_df_from_upload(matrix_file, session_dir / matrix_file.filename)

@@ -1,5 +1,5 @@
 {
-  "name": "qsarkit",
+  "name": "qsarmodeling",
   "private": true,
   "scripts": {
     "build": "turbo run build",
