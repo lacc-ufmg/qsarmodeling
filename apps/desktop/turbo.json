@@ -3,15 +3,19 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "dependsOn": ["frontend#build", "sync-sidecar"],
+      "dependsOn": ["prebuild"],
       "inputs": ["$TURBO_DEFAULT$", "src-tauri/**"],
       "outputs": ["src-tauri/target/release/**", "$TURBO_ROOT$/target/release/**"],
-      "cache": false
+      "cache": true
     },
     "sync-sidecar": {
       "dependsOn": ["backend#build"],
       "inputs": ["$TURBO_DEFAULT$", "scripts/sync-backend-sidecar.mjs"],
       "outputs": ["src-tauri/binaries/qsar-backend*"],
+      "cache": true
+    },
+    "prebuild": {
+      "dependsOn": ["frontend#build", "sync-sidecar"],
       "cache": true
     }
   }
