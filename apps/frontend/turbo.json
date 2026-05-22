@@ -7,7 +7,7 @@
       "inputs": ["$TURBO_DEFAULT$", "package.json", "*.config.mjs", "*.config.ts", "tsconfig.json", "src/**", "public/**"],
       "outputs": [".next/**", "out/**", "!.next/cache/**"]
     },
-    "dev": {
+    "_dev": {
       "cache": false,
       "persistent": true,
       "with": ["backend#dev"]

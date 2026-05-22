@@ -1,101 +1,109 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useState } from "react";
-import "./App.css";
 import {
-  loadDataset,
+  AppShell,
+  Container,
+  Title,
+  Text,
+  Paper,
+  Group,
+  Stack,
+  FileInput,
+  Button,
+  NumberInput,
+  Checkbox,
+  Radio,
+  Tooltip,
+  Alert,
+  Badge,
+  Collapse,
+  ActionIcon,
+  ThemeIcon,
+  Timeline,
+  Box,
+  Divider,
+  useMantineColorScheme,
+  Slider
+} from "@mantine/core";
+import {
+  IconFlask,
+  IconCheck,
+  IconAlertCircle,
+  IconChevronDown,
+  IconChevronUp,
+  IconQuestionMark,
+  IconUpload,
+  IconPlayerPlay,
+  IconDatabase,
+  IconFilter,
+  IconListCheck,
+  IconSun,
+  IconMoon
+} from "@tabler/icons-react";
+import {
   type DatasetProfile,
   type FilterSettings,
   type SelectionResult,
   type SelectionSettings,
   type ValidationResult,
   type ValidationSettings,
+  loadDataset,
   runFilters,
-  runPipeline,
   runSelection,
   runValidations,
+  runPipeline,
 } from "./lib/mockQsarBackend";
 
-type BusyState = "idle" | "loading-data" | "filtering" | "selecting" | "validating";
-
-type AppInfo = {
-  appName: string;
-  platform: string;
-  version: string;
-};
-
-const initialFilterSettings: FilterSettings = {
-  varCut: 0.15,
-  corrCut: 0.25,
-  autocorrCut: 0.25,
-  autoscale: true,
-  ljTransform: false,
-};
-
-const initialSelectionSettings: SelectionSettings = {
-  method: "ops",
-  latentVarsModel: 6,
-  latentVarsOps: 4,
-  varsPercentage: 15,
-  minVarsModel: 8,
-  maxVarsModel: 30,
-  populationSize: 80,
-  generations: 40,
-};
-
-const initialValidationSettings: ValidationSettings = {
-  runCrossValidation: true,
-  runYRandomization: true,
-  runLNO: true,
-  runExternalValidation: true,
-  yrandCutoff: 0.3,
-  lnoCutoff: 0.1,
-  testSetRatio: 0.2,
-};
-
-function Tooltip({ text }: { text: string }) {
-  const [show, setShow] = useState(false);
-
+function HelpTooltip ({ text }: { text: string; }) {
   return (
-    <span className="tooltip-wrap">
-      <button
-        type="button"
-        className="tooltip-trigger"
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-        onFocus={() => setShow(true)}
-        onBlur={() => setShow(false)}
+    <Tooltip label={text} multiline w={250} withArrow>
+      <ActionIcon variant="light" size="xs" radius="xl" color="gray">
+        <IconQuestionMark size="0.8rem" />
+      </ActionIcon>
+    </Tooltip>
+  );
+}
+
+function ExpandableSection ({ title, children }: { title: string; children: React.ReactNode; }) {
+  const [opened, setOpened] = useState(false);
+  return (
+    <Box mt="md">
+      <Divider my="sm" />
+      <Group
+        onClick={() => setOpened((o) => !o)}
+        style={{ cursor: "pointer" }}
+        gap="xs"
       >
-        ?
-      </button>
-      {show ? <span className="tooltip-bubble">{text}</span> : null}
-    </span>
+        {opened ? <IconChevronUp size="1.2rem" /> : <IconChevronDown size="1.2rem" />}
+        <Text size="sm" fw={500} c="dimmed">
+          {title}
+        </Text>
+      </Group>
+      <Collapse in={opened}>
+        <Box mt="md">{children}</Box>
+      </Collapse>
+    </Box>
   );
 }
 
-function ExpandableSection({ title, children }: { title: string; children: React.ReactNode }) {
-  const [expanded, setExpanded] = useState(false);
-
+function ResultCard ({ title, children }: { title: string; children: React.ReactNode; }) {
   return (
-    <div className="expandable">
-      <button type="button" className="expandable__toggle" onClick={() => setExpanded((value) => !value)}>
-        <span className={`expandable__chevron ${expanded ? "is-expanded" : ""}`}>⌄</span>
-        {title}
-      </button>
-      {expanded ? <div className="expandable__content">{children}</div> : null}
-    </div>
+    <Box mt="md">
+      <Divider my="sm" />
+      <Group gap="xs" mb="sm">
+        <ThemeIcon color="green" size="sm" radius="xl" variant="light">
+          <IconCheck size="0.8rem" />
+        </ThemeIcon>
+        <Text size="sm" fw={600} c="green">
+          {title}
+        </Text>
+      </Group>
+      <Box>{children}</Box>
+    </Box>
   );
 }
 
-function ResultCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="result-card">
-      <h3 className="result-card__title">{title}</h3>
-      <div className="result-card__body">{children}</div>
-    </div>
-  );
-}
-
-function NumberFieldWithTooltip({
+function NumberFieldWithTooltip ({
   label,
   help,
   value,
@@ -113,62 +121,122 @@ function NumberFieldWithTooltip({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="field">
-      <div className="field__label-row">
-        <span className="field__label">{label}</span>
-        <Tooltip text={help} />
-      </div>
-      <input
-        className="input"
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
+    <NumberInput
+      label={
+        <Group gap="xs">
+          {label}
+          <HelpTooltip text={help} />
+        </Group>
+      }
+      value={value}
+      min={min}
+      max={max}
+      step={step}
+      decimalScale={2}
+      fixedDecimalScale
+      allowedDecimalSeparators={['.', ',']}
+      onChange={(val) => onChange(Number(val) || 0)}
+    />
   );
 }
 
-function App() {
+function SliderFieldWithTooltip ({
+  label,
+  help,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  inverted
+}: {
+  label: string;
+  help: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  inverted?: boolean;
+}) {
+  return (
+    <Box>
+      <Group gap="xs" mb="xs">
+        <Text size="sm" fw={500}>{label}</Text>
+        <HelpTooltip text={help} />
+      </Group>
+      <Group gap="md">
+        <Slider
+          label={v => v.toString()}
+          inverted={inverted}
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onChangeEnd={onChange}
+          style={{ flex: 1 }}
+        />
+        <NumberInput
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(val) => onChange(Number(val) || 0)}
+          w={72}
+          fixedDecimalScale
+          hideControls
+          allowedDecimalSeparators={['.', ',']}
+        />
+      </Group>
+    </Box>
+  );
+}
+
+type BusyState = "idle" | "loading-data" | "filtering" | "selecting" | "validating";
+
+export default function Home () {
+  const { toggleColorScheme } = useMantineColorScheme();
   const [matrixFile, setMatrixFile] = useState<File | null>(null);
   const [vectorFile, setVectorFile] = useState<File | null>(null);
+
   const [uploadedDataset, setUploadedDataset] = useState<DatasetProfile | null>(null);
   const [activeDataset, setActiveDataset] = useState<DatasetProfile | null>(null);
   const [selectionResult, setSelectionResult] = useState<SelectionResult | null>(null);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [busyState, setBusyState] = useState<BusyState>("idle");
   const [error, setError] = useState("");
-  const [timeline, setTimeline] = useState<string[]>([]);
-  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
-  const [appInfoError, setAppInfoError] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
 
-  const [filterSettings, setFilterSettings] = useState<FilterSettings>(initialFilterSettings);
-  const [selectionSettings, setSelectionSettings] = useState<SelectionSettings>(initialSelectionSettings);
-  const [validationSettings, setValidationSettings] = useState<ValidationSettings>(initialValidationSettings);
+  const [filterSettings, setFilterSettings] = useState<FilterSettings>({
+    varCut: 0.3,
+    corrCut: 0.25,
+    autocorrCut: 0.85,
+    autoscale: true,
+    ljTransform: false,
+  });
 
-  useEffect(() => {
-    let mounted = true;
+  const [selectionSettings, setSelectionSettings] = useState<SelectionSettings>({
+    method: "ops",
+    latentVarsModel: 6,
+    latentVarsOps: 4,
+    varsPercentage: 15,
+    minVarsModel: 8,
+    maxVarsModel: 30,
+    populationSize: 80,
+    generations: 40,
+  });
 
-    invoke<AppInfo>("app_info")
-      .then((info) => {
-        if (mounted) {
-          setAppInfo(info);
-        }
-      })
-      .catch((invokeError: unknown) => {
-        if (mounted) {
-          setAppInfoError(invokeError instanceof Error ? invokeError.message : "Failed to read app info.");
-        }
-      });
+  const [validationSettings, setValidationSettings] = useState<ValidationSettings>({
+    runCrossValidation: true,
+    runYRandomization: true,
+    runLNO: true,
+    runExternalValidation: true,
+    yrandCutoff: 0.3,
+    lnoCutoff: 0.1,
+    testSetRatio: 0.2,
+  });
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const busyCopy: Record<BusyState, { label: string; description: string }> = {
+  const busyCopy: Record<BusyState, { label: string; description: string; }> = {
     idle: {
       label: "Ready",
       description: "Choose the input files, then step through preprocessing, selection, and validation.",
@@ -193,61 +261,31 @@ function App() {
 
   const currentBusyCopy = busyCopy[busyState];
 
+  const appendHistory = (message: string): void => {
+    setHistory((current) => [
+      `${new Date().toLocaleTimeString()} - ${message}`,
+      ...current.slice(0, 7),
+    ]);
+  };
+
   const nextStepMessage = useMemo(() => {
     if (busyState !== "idle") {
       return `Wait for ${currentBusyCopy.label.toLowerCase()} to finish before moving on.`;
     }
-
     if (!matrixFile || !vectorFile) {
       return "Select both CSV files to unlock the dataset loader.";
     }
-
     if (!uploadedDataset) {
       return "Load the dataset first so preprocessing and selection can use the active matrix.";
     }
-
     if (!selectionResult) {
       return "Review the preprocessing settings, then run variable selection.";
     }
-
     if (!validationResult) {
       return "Run the validation suite to confirm model quality and stability.";
     }
-
     return "Try a different filter or selection configuration to compare outcomes.";
-  }, [busyState, currentBusyCopy.label, matrixFile, uploadedDataset, selectionResult, validationResult, vectorFile]);
-
-  const stages = useMemo(
-    () => [
-      {
-        label: "Data",
-        status: uploadedDataset ? "Loaded" : matrixFile && vectorFile ? "Ready to load" : "Waiting for files",
-        detail: uploadedDataset
-          ? `${uploadedDataset.matrixName} and ${uploadedDataset.vectorName}`
-          : "Choose both X and y CSV files first.",
-      },
-      {
-        label: "Preprocessing",
-        status: activeDataset?.source === "filtered" ? "Applied" : uploadedDataset ? "Ready to run" : "Blocked",
-        detail: activeDataset?.source === "filtered"
-          ? `${activeDataset.descriptors} descriptors active`
-          : "Tune the descriptor cuts and transforms.",
-      },
-      {
-        label: "Selection",
-        status: selectionResult ? "Completed" : activeDataset ? "Ready to run" : "Blocked",
-        detail: selectionResult
-          ? `${selectionResult.method.toUpperCase()} selected ${selectionResult.selectedDescriptors} descriptors`
-          : "Pick OPS or GA after preprocessing.",
-      },
-      {
-        label: "Validation",
-        status: validationResult ? "Completed" : selectionResult ? "Ready to run" : "Blocked",
-        detail: validationResult ? "Validation metrics are available below." : "Run the checks you want to inspect.",
-      },
-    ],
-    [activeDataset, matrixFile, selectionResult, uploadedDataset, validationResult, vectorFile],
-  );
+  }, [busyState, currentBusyCopy.label, matrixFile, vectorFile, uploadedDataset, selectionResult, validationResult]);
 
   const canRunFilters = Boolean(activeDataset) && busyState === "idle";
   const canRunSelection = Boolean(activeDataset) && busyState === "idle";
@@ -255,26 +293,20 @@ function App() {
   const canRunPipeline = Boolean(matrixFile && vectorFile) && busyState === "idle";
   const canLoadData = Boolean(matrixFile && vectorFile) && busyState === "idle";
 
-  const appendTimeline = (message: string): void => {
-    setTimeline((current) => [`${new Date().toLocaleTimeString()} - ${message}`, ...current.slice(0, 7)]);
-  };
-
-  async function handleLoadData(): Promise<void> {
+  async function handleLoadData (): Promise<void> {
     if (!matrixFile || !vectorFile) {
       setError("Select both X matrix and y vector files before loading.");
       return;
     }
-
     setError("");
     setBusyState("loading-data");
-
     try {
       const loaded = await loadDataset(matrixFile, vectorFile);
       setUploadedDataset(loaded);
       setActiveDataset(loaded);
       setSelectionResult(null);
       setValidationResult(null);
-      appendTimeline(`Loaded dataset (${loaded.rows} rows, ${loaded.descriptors} descriptors).`);
+      appendHistory(`Loaded dataset (${loaded.rows} rows, ${loaded.descriptors} descriptors).`);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load dataset.");
     } finally {
@@ -282,19 +314,15 @@ function App() {
     }
   }
 
-  async function handleRunFilters(): Promise<void> {
-    if (!uploadedDataset) {
-      return;
-    }
-
+  async function handleRunFilters (): Promise<void> {
+    if (!uploadedDataset) return;
     setBusyState("filtering");
-
     try {
       const filtered = await runFilters(uploadedDataset.sessionId, filterSettings);
       setActiveDataset(filtered);
       setSelectionResult(null);
       setValidationResult(null);
-      appendTimeline(`Applied descriptor filters. Active matrix now has ${filtered.descriptors} descriptors.`);
+      appendHistory(`Applied descriptor filters. Active matrix now has ${filtered.descriptors} descriptors.`);
     } catch (filterError) {
       setError(filterError instanceof Error ? filterError.message : "Failed to run descriptor filters.");
     } finally {
@@ -302,19 +330,15 @@ function App() {
     }
   }
 
-  async function handleRunSelection(): Promise<void> {
-    if (!uploadedDataset) {
-      return;
-    }
-
+  async function handleRunSelection (): Promise<void> {
+    if (!uploadedDataset) return;
     setBusyState("selecting");
-
     try {
       const selected = await runSelection(uploadedDataset.sessionId, filterSettings, selectionSettings);
       setSelectionResult(selected);
       setValidationResult(null);
-      appendTimeline(
-        `${selected.method.toUpperCase()} selected ${selected.selectedDescriptors} descriptors (Q² ${selected.q2.toFixed(3)}).`,
+      appendHistory(
+        `${selected.method.toUpperCase()} selected ${selected.selectedDescriptors} descriptors (Q² ${selected.q2.toFixed(3)}).`
       );
     } catch (selectionError) {
       setError(selectionError instanceof Error ? selectionError.message : "Failed to run variable selection.");
@@ -323,17 +347,13 @@ function App() {
     }
   }
 
-  async function handleRunValidation(): Promise<void> {
-    if (!uploadedDataset) {
-      return;
-    }
-
+  async function handleRunValidation (): Promise<void> {
+    if (!uploadedDataset) return;
     setBusyState("validating");
-
     try {
       const results = await runValidations(uploadedDataset.sessionId, validationSettings);
       setValidationResult(results);
-      appendTimeline("Validation suite completed.");
+      appendHistory("Validation suite completed.");
     } catch (validationError) {
       setError(validationError instanceof Error ? validationError.message : "Failed to run validations.");
     } finally {
@@ -341,7 +361,7 @@ function App() {
     }
   }
 
-  async function handleRunPipeline(): Promise<void> {
+  async function handleRunPipeline (): Promise<void> {
     if (!matrixFile || !vectorFile) {
       setError("Select both X matrix and y vector files before running the full pipeline.");
       return;
@@ -349,25 +369,29 @@ function App() {
 
     setError("");
     setBusyState("loading-data");
-
     try {
       const loaded = await loadDataset(matrixFile, vectorFile);
       setUploadedDataset(loaded);
       setSelectionResult(null);
       setValidationResult(null);
-      appendTimeline(`Loaded dataset (${loaded.rows} rows, ${loaded.descriptors} descriptors).`);
+      appendHistory(`Loaded dataset (${loaded.rows} rows, ${loaded.descriptors} descriptors).`);
 
       setBusyState("filtering");
-      const pipeline = await runPipeline(loaded.sessionId, filterSettings, selectionSettings, validationSettings);
+      const pipeline = await runPipeline(
+        loaded.sessionId,
+        filterSettings,
+        selectionSettings,
+        validationSettings
+      );
       setActiveDataset(pipeline.dataset);
       setSelectionResult(pipeline.selection);
       setValidationResult(pipeline.validation);
-      appendTimeline(`Applied descriptor filters. Active matrix now has ${pipeline.dataset.descriptors} descriptors.`);
-      appendTimeline(
-        `${pipeline.selection.method.toUpperCase()} selected ${pipeline.selection.selectedDescriptors} descriptors (Q² ${pipeline.selection.q2.toFixed(3)}).`,
+      appendHistory(`Applied descriptor filters. Active matrix now has ${pipeline.dataset.descriptors} descriptors.`);
+      appendHistory(
+        `${pipeline.selection.method.toUpperCase()} selected ${pipeline.selection.selectedDescriptors} descriptors (Q² ${pipeline.selection.q2.toFixed(3)}).`
       );
-      appendTimeline("Validation suite completed.");
-      appendTimeline("Full pipeline finished with backend results.");
+      appendHistory("Validation suite completed.");
+      appendHistory("Full pipeline finished with backend results.");
     } catch (pipelineError) {
       setError(pipelineError instanceof Error ? pipelineError.message : "Failed to run the full pipeline.");
     } finally {
@@ -375,525 +399,563 @@ function App() {
     }
   }
 
+  const t = (k: string) => k;
+
   return (
-    <div className="app-shell">
-      <div className="app-shell__glow app-shell__glow--one" />
-      <div className="app-shell__glow app-shell__glow--two" />
+    <AppShell header={{ height: 78 }} padding="lg">
+      <AppShell.Header>
+        <Container size="lg" h="100%">
+          <Group h="100%" justify="space-between">
+            <Group gap="md" align="center">
+              <ThemeIcon radius="md" size="lg" variant="light" color="teal">
+                <IconFlask size={18} />
+              </ThemeIcon>
+              <Box>
+                <Text size="xs" tt="uppercase" fw={600} c="dimmed">
+                  {t("header.eyebrow")}
+                </Text>
+                <Text fw={700}>{t("header.title")}</Text>
+              </Box>
+            </Group>
+            <Group gap="sm" wrap="nowrap">
+              {/* <SegmentedControl
+                aria-label={t("header.language")}
+                value={language}
+                onChange={(value: string) => setLanguage(value as Language)}
+                data={[
+                  { value: "pt", label: "PT" },
+                  { value: "en", label: "EN" },
+                ]}
+                size="xs"
+              /> */}
+              <ActionIcon
+                onClick={() => toggleColorScheme()}
+                variant="default"
+                size="lg"
+                aria-label="Toggle color scheme"
+              >
+                <IconSun className="mantine-light-hidden" stroke={1.5} />
+                <IconMoon className="mantine-dark-hidden" stroke={1.5} />
+              </ActionIcon>
+            </Group>
+          </Group>
+        </Container>
+      </AppShell.Header>
+      <AppShell.Main>
+        <Container size="md" py="xl">
+          <Stack gap="xl">
+            <Group justify="space-between" align="flex-start">
+              <Box>
+                <Text c="blue" fw={600} tt="uppercase" lts={2} size="sm">
+                  Guided workflow
+                </Text>
+                <Title order={1} mt="xs">
+                  QSAR Model Builder
+                </Title>
+                <Text c="dimmed" mt="sm">
+                  A guided workflow for QSAR model development. Follow the steps in order, and we&apos;ll help you at each stage with sensible defaults and detailed explanations.
+                </Text>
+              </Box>
+              <ActionIcon
+                onClick={() => toggleColorScheme()}
+                variant="default"
+                size="lg"
+                aria-label="Toggle color scheme"
+              >
+                <IconSun className="mantine-light-hidden" stroke={1.5} />
+                <IconMoon className="mantine-dark-hidden" stroke={1.5} />
+              </ActionIcon>
+            </Group>
 
-      <main className="workspace">
-        <header className="hero">
-          <div className="hero__topline">
-            <span className="eyebrow">Guided workflow</span>
-            <span className="status-chip">
-              {appInfo ? `${appInfo.appName} · ${appInfo.platform}` : appInfoError || "Desktop runtime"}
-            </span>
-          </div>
+            {error && (
+              <Alert icon={<IconAlertCircle size="1rem" />} title="Error" color="red">
+                {error}
+              </Alert>
+            )}
 
-          <h1>QSAR Model Builder</h1>
-          <p className="hero__lead">
-            A desktop workflow for QSAR model development. Load data, apply descriptor filters, select variables,
-            and validate results in one local app.
-          </p>
+            {/* Step 1: Load Data */}
+            <Paper withBorder p="lg" radius="md" shadow="sm">
+              <Group justify="space-between" mb="md">
+                <Group>
+                  <ThemeIcon size="lg" radius="xl" variant="light" color="blue">
+                    1
+                  </ThemeIcon>
+                  <Box>
+                    <Title order={3}>Load your data</Title>
+                    <Text size="sm" c="dimmed">Upload CSV files for the descriptor matrix (X) and target variable (y)</Text>
+                  </Box>
+                </Group>
+                {uploadedDataset && <IconCheck color="var(--mantine-color-green-6)" />}
+              </Group>
 
-          <div className="hero__meta">
-            <span className="meta-pill">Vite + React</span>
-            <span className="meta-pill">Tauri desktop</span>
-            <span className="meta-pill">Rust bridge</span>
-            {appInfo ? <span className="meta-pill">v{appInfo.version}</span> : null}
-          </div>
-        </header>
+              <Stack>
+                <Group grow>
+                  <FileInput
+                    label="X matrix (.csv)"
+                    placeholder="Choose file"
+                    accept=".csv"
+                    value={matrixFile}
+                    onChange={setMatrixFile}
+                    leftSection={<IconUpload size="1rem" />}
+                  />
+                  <FileInput
+                    label="y vector (.csv)"
+                    placeholder="Choose file"
+                    accept=".csv"
+                    value={vectorFile}
+                    onChange={setVectorFile}
+                    leftSection={<IconUpload size="1rem" />}
+                  />
+                </Group>
+                <Box>
+                  <Button
+                    onClick={handleLoadData}
+                    disabled={!canLoadData}
+                    loading={busyState === "loading-data"}
+                    leftSection={<IconDatabase size="1rem" />}
+                  >
+                    Load dataset
+                  </Button>
+                </Box>
+              </Stack>
 
-        {error ? <section className="alert alert--error">{error}</section> : null}
+              {uploadedDataset && (
+                <ResultCard title="Dataset loaded successfully">
+                  <Group grow>
+                    <Box>
+                      <Text size="xs" c="dimmed">Rows:</Text>
+                      <Text fw={600}>{uploadedDataset.rows}</Text>
+                    </Box>
+                    <Box>
+                      <Text size="xs" c="dimmed">Descriptors:</Text>
+                      <Text fw={600}>{uploadedDataset.descriptors}</Text>
+                    </Box>
+                    <Box>
+                      <Text size="xs" c="dimmed">Files:</Text>
+                      <Text fw={600} size="sm">{uploadedDataset.matrixName}, {uploadedDataset.vectorName}</Text>
+                    </Box>
+                  </Group>
+                </ResultCard>
+              )}
+            </Paper>
 
-        {busyState !== "idle" ? (
-          <section className="alert alert--busy">
-            <div className="spinner" aria-hidden="true" />
-            <div>
-              <strong>{currentBusyCopy.label}</strong>
-              <p>{currentBusyCopy.description}</p>
-            </div>
-          </section>
-        ) : null}
+            {/* Step 2: Preprocessing */}
+            <Paper withBorder p="lg" radius="md" shadow="sm" opacity={!uploadedDataset ? 0.5 : 1}>
+              <Group justify="space-between" mb="md">
+                <Group>
+                  <ThemeIcon size="lg" radius="xl" variant="light" color="blue">
+                    2
+                  </ThemeIcon>
+                  <Box>
+                    <Title order={3}>Filter descriptors</Title>
+                    <Text size="sm" c="dimmed">Remove noisy variables before model selection</Text>
+                  </Box>
+                </Group>
+                {activeDataset?.source === "filtered" && <IconCheck color="var(--mantine-color-green-6)" />}
+              </Group>
 
-        <section className="status-panel">
-          <div>
-            <p className="status-panel__label">Current status</p>
-            <h2>{currentBusyCopy.label}</h2>
-          </div>
-          <p className="status-panel__message">{nextStepMessage}</p>
-        </section>
+              {uploadedDataset ? (
+                <Stack>
+                  <Paper p="md" radius="sm">
+                    <Text size="sm" fw={500} mb="sm">Basic settings (recommended for most datasets)</Text>
+                    <Box>
+                      <SliderFieldWithTooltip
+                        label="Variance cut"
+                        help="Removes descriptors with low variance across samples. Higher values filter more aggressively."
+                        value={filterSettings.varCut}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onChange={(v) => setFilterSettings((prev) => ({ ...prev, varCut: v }))}
+                      />
 
-        <section className="stage-grid">
-          {stages.map((stage) => (
-            <article className="stage-card" key={stage.label}>
-              <div className="stage-card__header">
-                <span className="stage-card__label">{stage.label}</span>
-                <span className="stage-card__status">{stage.status}</span>
-              </div>
-              <p>{stage.detail}</p>
-            </article>
-          ))}
-        </section>
+                      <SliderFieldWithTooltip
+                        label="Correlation cut"
+                        help="Removes highly correlated descriptors to reduce multicollinearity. Higher values filter more aggressively."
+                        value={filterSettings.corrCut}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onChange={(v) => setFilterSettings((prev) => ({ ...prev, corrCut: v }))}
+                      />
 
-        <div className="panels">
-          <section className="panel">
-            <div className="panel__header">
-              <div>
-                <div className="step-badge">1</div>
-                <h2>Load your data</h2>
-                <p>Upload CSV files for the descriptor matrix and target vector.</p>
-              </div>
-              {uploadedDataset ? <span className="checkmark">✓</span> : null}
-            </div>
+                      <SliderFieldWithTooltip
+                        label="Autocorrelation cut"
+                        help="Removes descriptors with high autocorrelation within themselves. Lower values filter more aggressively."
+                        inverted
+                        value={filterSettings.autocorrCut}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onChange={(v) => setFilterSettings((prev) => ({ ...prev, autocorrCut: v }))}
+                      />
+                    </Box>
+                  </Paper>
 
-            {!uploadedDataset ? (
-              <>
-                <div className="file-grid">
-                  <label className="field">
-                    <span className="field__label">X matrix (.csv)</span>
-                    <input className="input input--file" type="file" accept=".csv" onChange={(event) => setMatrixFile(event.target.files?.[0] ?? null)} />
-                    <span className="field__hint">{matrixFile?.name || "No file selected"}</span>
-                  </label>
-
-                  <label className="field">
-                    <span className="field__label">y vector (.csv)</span>
-                    <input className="input input--file" type="file" accept=".csv" onChange={(event) => setVectorFile(event.target.files?.[0] ?? null)} />
-                    <span className="field__hint">{vectorFile?.name || "No file selected"}</span>
-                  </label>
-                </div>
-
-                <button className="button button--primary" disabled={!canLoadData} type="button" onClick={handleLoadData}>
-                  {busyState === "loading-data" ? <span className="button__spinner" /> : null}
-                  {busyState === "loading-data" ? "Loading dataset..." : "Load dataset"}
-                </button>
-              </>
-            ) : null}
-
-            {uploadedDataset ? (
-              <ResultCard title="Dataset loaded successfully">
-                <div className="stats-grid stats-grid--three">
-                  <div>
-                    <span>Rows</span>
-                    <strong>{uploadedDataset.rows}</strong>
-                  </div>
-                  <div>
-                    <span>Descriptors</span>
-                    <strong>{uploadedDataset.descriptors}</strong>
-                  </div>
-                  <div>
-                    <span>Files</span>
-                    <strong>{uploadedDataset.matrixName}</strong>
-                    <strong>{uploadedDataset.vectorName}</strong>
-                  </div>
-                </div>
-              </ResultCard>
-            ) : null}
-          </section>
-
-          <section className={`panel ${!uploadedDataset ? "panel--muted" : ""}`}>
-            <div className="panel__header">
-              <div>
-                <div className="step-badge">2</div>
-                <h2>Filter descriptors</h2>
-                <p>Remove noisy variables before model selection.</p>
-              </div>
-              {activeDataset?.source === "filtered" ? <span className="checkmark">✓</span> : null}
-            </div>
-
-            {uploadedDataset ? (
-              <>
-                <div className="card-surface">
-                  <p className="card-surface__title">Basic settings</p>
-                  <div className="field-grid field-grid--three">
-                    <NumberFieldWithTooltip
-                      label="Variance cut"
-                      help="Removes descriptors with low variance across samples. Higher values filter more aggressively."
-                      value={filterSettings.varCut}
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      onChange={(value) => setFilterSettings((prev) => ({ ...prev, varCut: value }))}
-                    />
-                    <NumberFieldWithTooltip
-                      label="Correlation cut"
-                      help="Removes highly correlated descriptors to reduce multicollinearity. Higher values filter more aggressively."
-                      value={filterSettings.corrCut}
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      onChange={(value) => setFilterSettings((prev) => ({ ...prev, corrCut: value }))}
-                    />
-                    <NumberFieldWithTooltip
-                      label="Autocorrelation cut"
-                      help="Removes descriptors with high autocorrelation within themselves. Lower values filter more aggressively."
-                      value={filterSettings.autocorrCut}
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      onChange={(value) => setFilterSettings((prev) => ({ ...prev, autocorrCut: value }))}
-                    />
-                  </div>
-                </div>
-
-                <ExpandableSection title="Fine-tune settings">
-                  <div className="option-stack">
-                    <label className="toggle-row">
-                      <input
-                        type="checkbox"
+                  <ExpandableSection title="Fine-tune settings">
+                    <Stack gap="sm">
+                      <Checkbox
+                        label={<Text size="sm">Autoscale <Text span c="dimmed">(mean-center and scale to unit variance)</Text></Text>}
                         checked={filterSettings.autoscale}
-                        onChange={(event) => setFilterSettings((prev) => ({ ...prev, autoscale: event.target.checked }))}
+                        onChange={(e) => setFilterSettings((prev) => ({ ...prev, autoscale: e.currentTarget.checked }))}
                       />
-                      <span>
-                        <strong>Autoscale</strong>
-                        <span>Mean-center and scale to unit variance.</span>
-                      </span>
-                    </label>
-                    <label className="toggle-row">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        label={<Text size="sm">LJ transform <Text span c="dimmed">(apply Lennard-Jones descriptor transformation)</Text></Text>}
                         checked={filterSettings.ljTransform}
-                        onChange={(event) => setFilterSettings((prev) => ({ ...prev, ljTransform: event.target.checked }))}
+                        onChange={(e) => setFilterSettings((prev) => ({ ...prev, ljTransform: e.currentTarget.checked }))}
                       />
-                      <span>
-                        <strong>LJ transform</strong>
-                        <span>Apply Lennard-Jones descriptor transformation.</span>
-                      </span>
-                    </label>
-                  </div>
-                </ExpandableSection>
+                    </Stack>
+                  </ExpandableSection>
 
-                <button className="button button--secondary" disabled={!canRunFilters} type="button" onClick={handleRunFilters}>
-                  {busyState === "filtering" ? <span className="button__spinner" /> : null}
-                  {busyState === "filtering" ? "Applying filters..." : "Apply filters"}
-                </button>
-              </>
-            ) : (
-              <p className="empty-state">Load a dataset first to enable filtering.</p>
-            )}
+                  <Box>
+                    <Button
+                      onClick={handleRunFilters}
+                      disabled={!canRunFilters}
+                      loading={busyState === "filtering"}
+                      variant="default"
+                      leftSection={<IconFilter size="1rem" />}
+                    >
+                      Apply filters
+                    </Button>
+                  </Box>
+                </Stack>
+              ) : (
+                <Text size="sm" c="dimmed">Load a dataset first to enable filtering.</Text>
+              )}
 
-            {activeDataset?.source === "filtered" ? (
-              <ResultCard title="Filters applied successfully">
-                <div className="stats-grid stats-grid--two">
-                  <div>
-                    <span>Active descriptors</span>
-                    <strong>{activeDataset.descriptors}</strong>
-                  </div>
-                  <div>
-                    <span>Removed</span>
-                    <strong>{uploadedDataset ? uploadedDataset.descriptors - activeDataset.descriptors : 0}</strong>
-                  </div>
-                </div>
-              </ResultCard>
-            ) : null}
-          </section>
+              {activeDataset?.source === "filtered" && (
+                <ResultCard title="Filters applied successfully">
+                  <Group grow>
+                    <Box>
+                      <Text size="xs" c="dimmed">Active descriptors:</Text>
+                      <Text fw={600}>{activeDataset.descriptors}</Text>
+                    </Box>
+                    <Box>
+                      <Text size="xs" c="dimmed">Removed:</Text>
+                      <Text fw={600}>{uploadedDataset ? uploadedDataset.descriptors - activeDataset.descriptors : 0}</Text>
+                    </Box>
+                  </Group>
+                </ResultCard>
+              )}
+            </Paper>
 
-          <section className={`panel ${!activeDataset ? "panel--muted" : ""}`}>
-            <div className="panel__header">
-              <div>
-                <div className="step-badge">3</div>
-                <h2>Select variables</h2>
-                <p>Choose the best subset of descriptors for your model.</p>
-              </div>
-              {selectionResult ? <span className="checkmark">✓</span> : null}
-            </div>
+            {/* Step 3: Selection */}
+            <Paper withBorder p="lg" radius="md" shadow="sm" opacity={!activeDataset ? 0.5 : 1}>
+              <Group justify="space-between" mb="md">
+                <Group>
+                  <ThemeIcon size="lg" radius="xl" variant="light" color="blue">
+                    3
+                  </ThemeIcon>
+                  <Box>
+                    <Title order={3}>Select variables</Title>
+                    <Text size="sm" c="dimmed">Choose the best subset of descriptors for your model</Text>
+                  </Box>
+                </Group>
+                {selectionResult && <IconCheck color="var(--mantine-color-green-6)" />}
+              </Group>
 
-            {activeDataset ? (
-              <>
-                <div className="card-surface">
-                  <p className="card-surface__title">Choose selection method</p>
-                  <div className="choice-grid">
-                    <label className={`choice-card ${selectionSettings.method === "ops" ? "choice-card--active" : ""}`}>
-                      <input type="radio" checked={selectionSettings.method === "ops"} onChange={() => setSelectionSettings((prev) => ({ ...prev, method: "ops" }))} />
-                      <span>
-                        <strong>OPS</strong>
-                        <span>Orthogonal Projections to Latent Structures</span>
-                      </span>
-                    </label>
+              {activeDataset ? (
+                <Stack>
+                  <Paper p="md" radius="sm">
+                    <Text size="sm" fw={500} mb="sm">Choose selection method</Text>
+                    <Radio.Group
+                      value={selectionSettings.method}
+                      onChange={(v: any) => setSelectionSettings((prev) => ({ ...prev, method: v }))}
+                    >
+                      <Group mt="xs">
+                        <Radio value="ops" label={<Text size="sm">OPS <Text span size="xs" c="dimmed">(Ordered Predictors Selection)</Text></Text>} />
+                        <Radio value="ga" label={<Text size="sm">GA <Text span size="xs" c="dimmed">(Genetic Algorithm)</Text></Text>} />
+                      </Group>
+                    </Radio.Group>
+                  </Paper>
 
-                    <label className={`choice-card ${selectionSettings.method === "ga" ? "choice-card--active" : ""}`}>
-                      <input type="radio" name="method" checked={selectionSettings.method === "ga"} onChange={() => setSelectionSettings((prev) => ({ ...prev, method: "ga" }))} />
-                      <span>
-                        <strong>GA</strong>
-                        <span>Genetic Algorithm</span>
-                      </span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="card-surface card-surface--spaced">
-                  <p className="card-surface__title">Basic settings</p>
-                  <div className="field-grid field-grid--two">
-                    <NumberFieldWithTooltip
-                      label="Latent variables (model)"
-                      help="Number of latent variables (PLS components) in the final model. Higher values provide better quality with longer calculations."
-                      value={selectionSettings.latentVarsModel}
-                      min={1}
-                      max={30}
-                      step={1}
-                      onChange={(value) => setSelectionSettings((prev) => ({ ...prev, latentVarsModel: value }))}
-                    />
-
-                    {selectionSettings.method === "ops" ? (
+                  <Paper p="md" radius="sm">
+                    <Text size="sm" fw={500} mb="sm">Basic settings</Text>
+                    <Group grow>
                       <NumberFieldWithTooltip
-                        label="Latent variables (OPS)"
-                        help="Number of latent variables used during OPS selection process. Higher values increase computational cost but may improve robustness."
-                        value={selectionSettings.latentVarsOps}
+                        label="Latent variables (model)"
+                        help="Number of latent variables (PLS components) in the final model. Higher values provide better quality with longer calculations."
+                        value={selectionSettings.latentVarsModel}
                         min={1}
-                        max={20}
+                        max={30}
                         step={1}
-                        onChange={(value) => setSelectionSettings((prev) => ({ ...prev, latentVarsOps: value }))}
+                        onChange={(v) => setSelectionSettings((prev) => ({ ...prev, latentVarsModel: v }))}
                       />
-                    ) : null}
-                  </div>
-                </div>
-
-                <ExpandableSection title={`${selectionSettings.method === "ops" ? "OPS" : "GA"} fine-tuning`}>
-                  <div className="option-stack">
-                    {selectionSettings.method === "ops" ? (
-                      <NumberFieldWithTooltip
-                        label="Variables percentage"
-                        help="Percentage of descriptors to evaluate during OPS selection. Lower values reduce search space but may miss optimal features."
-                        value={selectionSettings.varsPercentage}
-                        min={1}
-                        max={60}
-                        step={1}
-                        onChange={(value) => setSelectionSettings((prev) => ({ ...prev, varsPercentage: value }))}
-                      />
-                    ) : (
-                      <>
+                      {selectionSettings.method === "ops" && (
                         <NumberFieldWithTooltip
-                          label="Min vars per model"
-                          help="Minimum number of descriptors in any candidate model. Higher values create more complex models but reduce overfitting risk."
-                          value={selectionSettings.minVarsModel}
+                          label="Latent variables (OPS)"
+                          help="Number of latent variables used during OPS selection process. Higher values increase computational cost but may improve robustness."
+                          value={selectionSettings.latentVarsOps}
                           min={1}
-                          max={50}
+                          max={20}
                           step={1}
-                          onChange={(value) => setSelectionSettings((prev) => ({ ...prev, minVarsModel: value }))}
+                          onChange={(v) => setSelectionSettings((prev) => ({ ...prev, latentVarsOps: v }))}
                         />
+                      )}
+                    </Group>
+                  </Paper>
+
+                  <ExpandableSection title={`${selectionSettings.method === "ops" ? "OPS" : "GA"} fine-tuning`}>
+                    <Stack gap="md">
+                      {selectionSettings.method === "ops" ? (
                         <NumberFieldWithTooltip
-                          label="Max vars per model"
-                          help="Maximum number of descriptors in any candidate model. Lower values favor simpler models; higher values allow more complex solutions."
-                          value={selectionSettings.maxVarsModel}
-                          min={2}
-                          max={200}
+                          label="Variables percentage"
+                          help="Percentage of descriptors to evaluate during OPS selection. Lower values reduce search space but may miss optimal features."
+                          value={selectionSettings.varsPercentage}
+                          min={1}
+                          max={60}
                           step={1}
-                          onChange={(value) => setSelectionSettings((prev) => ({ ...prev, maxVarsModel: value }))}
+                          onChange={(v) => setSelectionSettings((prev) => ({ ...prev, varsPercentage: v }))}
                         />
-                        <NumberFieldWithTooltip
-                          label="Population size"
-                          help="Number of models in each generation of the genetic algorithm. Larger populations explore the search space better but increase computation time."
-                          value={selectionSettings.populationSize}
-                          min={20}
-                          max={300}
-                          step={1}
-                          onChange={(value) => setSelectionSettings((prev) => ({ ...prev, populationSize: value }))}
-                        />
-                        <NumberFieldWithTooltip
-                          label="Generations"
-                          help="Number of generations to evolve in the genetic algorithm. More generations improve convergence but require longer computation."
-                          value={selectionSettings.generations}
-                          min={10}
-                          max={500}
-                          step={1}
-                          onChange={(value) => setSelectionSettings((prev) => ({ ...prev, generations: value }))}
-                        />
-                      </>
-                    )}
-                  </div>
-                </ExpandableSection>
+                      ) : (
+                        <>
+                          <Group grow>
+                            <NumberFieldWithTooltip
+                              label="Min vars per model"
+                              help="Minimum number of descriptors in any candidate model. Higher values create more complex models but reduce overfitting risk."
+                              value={selectionSettings.minVarsModel}
+                              min={1}
+                              max={50}
+                              step={1}
+                              onChange={(v) => setSelectionSettings((prev) => ({ ...prev, minVarsModel: v }))}
+                            />
+                            <NumberFieldWithTooltip
+                              label="Max vars per model"
+                              help="Maximum number of descriptors in any candidate model. Lower values favor simpler models; higher values allow more complex solutions."
+                              value={selectionSettings.maxVarsModel}
+                              min={2}
+                              max={200}
+                              step={1}
+                              onChange={(v) => setSelectionSettings((prev) => ({ ...prev, maxVarsModel: v }))}
+                            />
+                          </Group>
+                          <Group grow>
+                            <NumberFieldWithTooltip
+                              label="Population size"
+                              help="Number of models in each generation of the genetic algorithm. Larger populations explore the search space better but increase computation time."
+                              value={selectionSettings.populationSize}
+                              min={20}
+                              max={300}
+                              step={1}
+                              onChange={(v) => setSelectionSettings((prev) => ({ ...prev, populationSize: v }))}
+                            />
+                            <NumberFieldWithTooltip
+                              label="Generations"
+                              help="Number of generations to evolve in the genetic algorithm. More generations improve convergence but require longer computation."
+                              value={selectionSettings.generations}
+                              min={10}
+                              max={500}
+                              step={1}
+                              onChange={(v) => setSelectionSettings((prev) => ({ ...prev, generations: v }))}
+                            />
+                          </Group>
+                        </>
+                      )}
+                    </Stack>
+                  </ExpandableSection>
 
-                <button className="button button--secondary" disabled={!canRunSelection} type="button" onClick={handleRunSelection}>
-                  {busyState === "selecting" ? <span className="button__spinner" /> : null}
-                  {busyState === "selecting" ? "Running selection..." : `Run ${selectionSettings.method.toUpperCase()}`}
-                </button>
-              </>
-            ) : (
-              <p className="empty-state">Complete preprocessing first to enable variable selection.</p>
-            )}
+                  <Box>
+                    <Button
+                      onClick={handleRunSelection}
+                      disabled={!canRunSelection}
+                      loading={busyState === "selecting"}
+                      variant="default"
+                      leftSection={<IconListCheck size="1rem" />}
+                    >
+                      Run {selectionSettings.method.toUpperCase()}
+                    </Button>
+                  </Box>
+                </Stack>
+              ) : (
+                <Text size="sm" c="dimmed">Complete preprocessing first to enable variable selection.</Text>
+              )}
 
-            {selectionResult ? (
-              <ResultCard title="Selection completed">
-                <div className="stats-grid stats-grid--three">
-                  <div>
-                    <span>Method</span>
-                    <strong>{selectionResult.method.toUpperCase()}</strong>
-                  </div>
-                  <div>
-                    <span>Descriptors</span>
-                    <strong>{selectionResult.selectedDescriptors}</strong>
-                  </div>
-                  <div>
-                    <span>Q²</span>
-                    <strong>{selectionResult.q2.toFixed(3)}</strong>
-                  </div>
-                  <div>
-                    <span>R²</span>
-                    <strong>{selectionResult.r2.toFixed(3)}</strong>
-                  </div>
-                  <div>
-                    <span>Latent variables</span>
-                    <strong>{selectionResult.latentVariables}</strong>
-                  </div>
-                  <div>
-                    <span>Validated</span>
-                    <strong>{selectionResult.validationPassed ? "Yes" : "No"}</strong>
-                  </div>
-                </div>
-              </ResultCard>
-            ) : null}
-          </section>
+              {selectionResult && (
+                <ResultCard title="Selection completed">
+                  <Group grow>
+                    <Box>
+                      <Text size="xs" c="dimmed">Method:</Text>
+                      <Text fw={600}>{selectionResult.method.toUpperCase()}</Text>
+                    </Box>
+                    <Box>
+                      <Text size="xs" c="dimmed">Descriptors:</Text>
+                      <Text fw={600}>{selectionResult.selectedDescriptors}</Text>
+                    </Box>
+                    <Box>
+                      <Text size="xs" c="dimmed">Q²:</Text>
+                      <Text fw={600}>{selectionResult.q2.toFixed(3)}</Text>
+                    </Box>
+                  </Group>
+                  <Group grow mt="sm">
+                    <Box>
+                      <Text size="xs" c="dimmed">R²:</Text>
+                      <Text fw={600}>{selectionResult.r2.toFixed(3)}</Text>
+                    </Box>
+                    <Box>
+                      <Text size="xs" c="dimmed">Latent variables:</Text>
+                      <Text fw={600}>{selectionResult.latentVariables}</Text>
+                    </Box>
+                  </Group>
+                </ResultCard>
+              )}
+            </Paper>
 
-          <section className={`panel ${!selectionResult ? "panel--muted" : ""}`}>
-            <div className="panel__header">
-              <div>
-                <div className="step-badge">4</div>
-                <h2>Validate model</h2>
-                <p>Run validation tests to confirm model quality and stability.</p>
-              </div>
-              {validationResult ? <span className="checkmark">✓</span> : null}
-            </div>
+            {/* Step 4: Validation */}
+            <Paper withBorder p="lg" radius="md" shadow="sm" opacity={!selectionResult ? 0.5 : 1}>
+              <Group justify="space-between" mb="md">
+                <Group>
+                  <ThemeIcon size="lg" radius="xl" variant="light" color="blue">
+                    4
+                  </ThemeIcon>
+                  <Box>
+                    <Title order={3}>Validate model</Title>
+                    <Text size="sm" c="dimmed">Run validation tests to confirm model quality and stability</Text>
+                  </Box>
+                </Group>
+                {validationResult && <IconCheck color="var(--mantine-color-green-6)" />}
+              </Group>
 
-            {selectionResult ? (
-              <>
-                <div className="card-surface">
-                  <p className="card-surface__title">Choose validation tests</p>
-                  <div className="choice-grid choice-grid--two">
-                    <label className="toggle-card">
-                      <input
-                        type="checkbox"
+              {selectionResult ? (
+                <Stack>
+                  <Paper p="md" radius="sm">
+                    <Text size="sm" fw={500} mb="sm">Choose validation tests</Text>
+                    <Group>
+                      <Checkbox
+                        label="Cross validation"
                         checked={validationSettings.runCrossValidation}
-                        onChange={(event) => setValidationSettings((prev) => ({ ...prev, runCrossValidation: event.target.checked }))}
+                        onChange={(e) => setValidationSettings((prev) => ({ ...prev, runCrossValidation: e.currentTarget.checked }))}
                       />
-                      <span>Cross validation</span>
-                    </label>
-                    <label className="toggle-card">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        label="Y-randomization"
                         checked={validationSettings.runYRandomization}
-                        onChange={(event) => setValidationSettings((prev) => ({ ...prev, runYRandomization: event.target.checked }))}
+                        onChange={(e) => setValidationSettings((prev) => ({ ...prev, runYRandomization: e.currentTarget.checked }))}
                       />
-                      <span>Y-randomization</span>
-                    </label>
-                    <label className="toggle-card">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        label="Leave-N-Out"
                         checked={validationSettings.runLNO}
-                        onChange={(event) => setValidationSettings((prev) => ({ ...prev, runLNO: event.target.checked }))}
+                        onChange={(e) => setValidationSettings((prev) => ({ ...prev, runLNO: e.currentTarget.checked }))}
                       />
-                      <span>Leave-N-Out</span>
-                    </label>
-                    <label className="toggle-card">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        label="External validation"
                         checked={validationSettings.runExternalValidation}
-                        onChange={(event) => setValidationSettings((prev) => ({ ...prev, runExternalValidation: event.target.checked }))}
+                        onChange={(e) => setValidationSettings((prev) => ({ ...prev, runExternalValidation: e.currentTarget.checked }))}
                       />
-                      <span>External validation</span>
-                    </label>
-                  </div>
-                </div>
+                    </Group>
+                  </Paper>
 
-                <ExpandableSection title="Fine-tune thresholds">
-                  <div className="field-grid field-grid--three">
-                    <NumberFieldWithTooltip
-                      label="Y-rand cutoff"
-                      help="Threshold for Y-randomization test. Models above this are likely overfit."
-                      value={validationSettings.yrandCutoff}
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      onChange={(value) => setValidationSettings((prev) => ({ ...prev, yrandCutoff: value }))}
-                    />
-                    <NumberFieldWithTooltip
-                      label="LNO cutoff"
-                      help="Threshold for Leave-N-Out test. Lower values are stricter; higher values accept more variation."
-                      value={validationSettings.lnoCutoff}
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      onChange={(value) => setValidationSettings((prev) => ({ ...prev, lnoCutoff: value }))}
-                    />
-                    <NumberFieldWithTooltip
-                      label="Test set ratio"
-                      help="Fraction of data to use for external validation."
-                      value={validationSettings.testSetRatio}
-                      min={0.1}
-                      max={0.5}
-                      step={0.01}
-                      onChange={(value) => setValidationSettings((prev) => ({ ...prev, testSetRatio: value }))}
-                    />
-                  </div>
-                </ExpandableSection>
+                  <ExpandableSection title="Fine-tune thresholds">
+                    <Group grow>
+                      <NumberFieldWithTooltip
+                        label="Y-rand cutoff"
+                        help="Threshold for Y-randomization test. Models above this are likely overfit."
+                        value={validationSettings.yrandCutoff}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onChange={(v) => setValidationSettings((prev) => ({ ...prev, yrandCutoff: v }))}
+                      />
+                      <NumberFieldWithTooltip
+                        label="LNO cutoff"
+                        help="Threshold for Leave-N-Out test. Lower values are stricter; higher values accept more variation."
+                        value={validationSettings.lnoCutoff}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onChange={(v) => setValidationSettings((prev) => ({ ...prev, lnoCutoff: v }))}
+                      />
+                      <NumberFieldWithTooltip
+                        label="Test set ratio"
+                        help="Fraction of data to use for external validation."
+                        value={validationSettings.testSetRatio}
+                        min={0.1}
+                        max={0.5}
+                        step={0.01}
+                        onChange={(v) => setValidationSettings((prev) => ({ ...prev, testSetRatio: v }))}
+                      />
+                    </Group>
+                  </ExpandableSection>
 
-                <div className="action-row">
-                  <button className="button button--secondary" disabled={!canRunValidation} type="button" onClick={handleRunValidation}>
-                    {busyState === "validating" ? <span className="button__spinner" /> : null}
-                    {busyState === "validating" ? "Running validation..." : "Run validation"}
-                  </button>
+                  <Group mt="md">
+                    <Button
+                      onClick={handleRunValidation}
+                      disabled={!canRunValidation}
+                      loading={busyState === "validating"}
+                      variant="default"
+                      leftSection={<IconListCheck size="1rem" />}
+                    >
+                      Run validation
+                    </Button>
+                    <Button
+                      onClick={handleRunPipeline}
+                      disabled={!canRunPipeline}
+                      loading={busyState !== "idle" && busyState !== "validating"}
+                      color="orange"
+                      leftSection={<IconPlayerPlay size="1rem" />}
+                    >
+                      Run full pipeline
+                    </Button>
+                  </Group>
+                </Stack>
+              ) : (
+                <Text size="sm" c="dimmed">Complete variable selection first to enable validation.</Text>
+              )}
 
-                  <button className="button button--accent" disabled={!canRunPipeline} type="button" onClick={handleRunPipeline}>
-                    {busyState !== "idle" ? <span className="button__spinner" /> : null}
-                    {busyState !== "idle" ? "Running full pipeline..." : "Run full pipeline"}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <p className="empty-state">Complete variable selection first to enable validation.</p>
+              {validationResult && (
+                <ResultCard title="Validation completed">
+                  <Stack gap="xs" mt="sm">
+                    {validationResult.cv && (
+                      <Group justify="space-between">
+                        <Text size="sm">Cross validation Q²:</Text>
+                        <Text size="sm" fw={600}>{validationResult.cv.q2.toFixed(3)}</Text>
+                      </Group>
+                    )}
+                    {validationResult.yr && (
+                      <Group justify="space-between">
+                        <Text size="sm">Y-randomization:</Text>
+                        <Text size="sm" fw={600} c={validationResult.yr.passed ? "green" : "red"}>
+                          {validationResult.yr.score.toFixed(3)} {validationResult.yr.passed ? "✓ PASS" : "✗ FAIL"}
+                        </Text>
+                      </Group>
+                    )}
+                    {validationResult.lno && (
+                      <Group justify="space-between">
+                        <Text size="sm">Leave-N-Out:</Text>
+                        <Text size="sm" fw={600} c={validationResult.lno.passed ? "green" : "red"}>
+                          {validationResult.lno.score.toFixed(3)} {validationResult.lno.passed ? "✓ PASS" : "✗ FAIL"}
+                        </Text>
+                      </Group>
+                    )}
+                    {validationResult.ext && (
+                      <Group justify="space-between">
+                        <Text size="sm">External validation R²pred:</Text>
+                        <Text size="sm" fw={600}>{validationResult.ext.r2Pred.toFixed(3)}</Text>
+                      </Group>
+                    )}
+                  </Stack>
+                </ResultCard>
+              )}
+            </Paper>
+
+            {/* Workflow Timeline */}
+            {history.length > 0 && (
+              <Paper withBorder p="lg" radius="md" shadow="sm">
+                <Title order={3} mb="lg">Workflow history</Title>
+                <Timeline active={history.length} bulletSize={24} lineWidth={2}>
+                  {history.map((item, index) => {
+                    const [time, ...msgParts] = item.split(" - ");
+                    const msg = msgParts.join(" - ");
+                    return (
+                      <Timeline.Item key={index} title={msg}>
+                        <Text c="dimmed" size="xs" mt={4}>{time}</Text>
+                      </Timeline.Item>
+                    );
+                  })}
+                </Timeline>
+              </Paper>
             )}
-
-            {validationResult ? (
-              <ResultCard title="Validation completed">
-                <div className="validation-list">
-                  {validationResult.cv ? (
-                    <div className="validation-row">
-                      <span>Cross validation Q²</span>
-                      <strong>{validationResult.cv.q2.toFixed(3)}</strong>
-                    </div>
-                  ) : null}
-
-                  {validationResult.yr ? (
-                    <div className="validation-row">
-                      <span>Y-randomization</span>
-                      <strong className={validationResult.yr.passed ? "text-success" : "text-danger"}>
-                        {validationResult.yr.score.toFixed(3)} {validationResult.yr.passed ? "PASS" : "FAIL"}
-                      </strong>
-                    </div>
-                  ) : null}
-
-                  {validationResult.lno ? (
-                    <div className="validation-row">
-                      <span>Leave-N-Out</span>
-                      <strong className={validationResult.lno.passed ? "text-success" : "text-danger"}>
-                        {validationResult.lno.score.toFixed(3)} {validationResult.lno.passed ? "PASS" : "FAIL"}
-                      </strong>
-                    </div>
-                  ) : null}
-
-                  {validationResult.ext ? (
-                    <div className="validation-row">
-                      <span>External validation R²pred</span>
-                      <strong>{validationResult.ext.r2Pred.toFixed(3)}</strong>
-                    </div>
-                  ) : null}
-                </div>
-              </ResultCard>
-            ) : null}
-          </section>
-        </div>
-
-        {timeline.length > 0 ? (
-          <section className="timeline-panel">
-            <h2>Workflow history</h2>
-            <ul className="timeline-list">
-              {timeline.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-      </main>
-    </div>
+          </Stack>
+        </Container>
+      </AppShell.Main>
+    </AppShell>
   );
 }
-
-export default App;

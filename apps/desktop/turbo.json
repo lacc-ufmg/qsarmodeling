@@ -17,6 +17,11 @@
     "prebuild": {
       "dependsOn": ["frontend#build", "sync-sidecar"],
       "cache": true
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "with": ["backend#dev"]
     }
   }
 }
