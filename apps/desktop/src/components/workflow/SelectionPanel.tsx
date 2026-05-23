@@ -4,11 +4,11 @@ import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import { ExpandableSection } from "../ui/ExpandableSection";
 import { NumberFieldWithTooltip } from "../ui/NumberFieldWithTooltip";
-import type { SelectionResult, SelectionSettings } from "../../lib/mockQsarBackend";
+import type { DatasetProfile, SelectionResult, SelectionSettings } from "../../lib/mockQsarBackend";
 import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
 
 type SelectionPanelProps = {
-  activeDataset: boolean;
+  activeDataset: DatasetProfile | null;
   selectionResult: SelectionResult | null;
   selectionSettings: SelectionSettings;
   isLoading: boolean;
@@ -27,6 +27,8 @@ export function SelectionPanel({
   onRunSelection,
 }: SelectionPanelProps) {
   const isOps = selectionSettings.method === "ops";
+
+
 
   return (
     <StepCard
@@ -78,26 +80,26 @@ export function SelectionPanel({
               Basic settings
             </Text>
             <Group grow>
-              <NumberFieldWithTooltip
-                label="Latent variables (model)"
-                help="Number of latent variables (PLS components) in the final model. Higher values provide better quality with longer calculations."
-                value={selectionSettings.latentVarsModel}
-                min={1}
-                max={30}
-                step={1}
-                onChange={(v) => onSettingsChange({ latentVarsModel: v })}
-              />
               {isOps && (
-                <NumberFieldWithTooltip
+                <SliderFieldWithTooltip
                   label="Latent variables (OPS)"
                   help="Number of latent variables used during OPS selection process. Higher values increase computational cost but may improve robustness."
                   value={selectionSettings.latentVarsOps}
                   min={1}
-                  max={20}
+                  max={Math.min(20, activeDataset.rows - 2, activeDataset.descriptors)}
                   step={1}
                   onChange={(v) => onSettingsChange({ latentVarsOps: v })}
                 />
               )}
+              <SliderFieldWithTooltip
+                label="Latent variables (model)"
+                help="Number of latent variables (PLS components) in the final model. Higher values provide better quality with longer calculations."
+                value={selectionSettings.latentVarsModel}
+                min={1}
+                max={Math.min(20, activeDataset.rows - 2, isOps ? selectionSettings.latentVarsOps : selectionSettings.maxVarsModel)}
+                step={1}
+                onChange={(v) => onSettingsChange({ latentVarsModel: v })}
+              />
             </Group>
           </Paper>
 
@@ -108,50 +110,51 @@ export function SelectionPanel({
               {isOps ? (
                 <SliderFieldWithTooltip
                   label="Variables percentage"
+                  sliderLabel={(v) => `${v}%`}
                   help="Percentage of descriptors to evaluate during OPS selection. Lower values reduce search space but may miss optimal features."
                   value={selectionSettings.varsPercentage}
                   min={1}
-                  max={100}
+                  max={99}
                   step={1}
                   onChange={(v) => onSettingsChange({ varsPercentage: v })}
                 />
               ) : (
                 <>
                   <Group grow>
-                    <NumberFieldWithTooltip
+                    <SliderFieldWithTooltip
                       label="Min vars per model"
                       help="Minimum number of descriptors in any candidate model. Higher values create more complex models but reduce overfitting risk."
                       value={selectionSettings.minVarsModel}
-                      min={1}
-                      max={50}
+                      min={2}
+                      max={selectionSettings.maxVarsModel}
                       step={1}
                       onChange={(v) => onSettingsChange({ minVarsModel: v })}
                     />
-                    <NumberFieldWithTooltip
+                    <SliderFieldWithTooltip
                       label="Max vars per model"
                       help="Maximum number of descriptors in any candidate model. Lower values favor simpler models; higher values allow more complex solutions."
                       value={selectionSettings.maxVarsModel}
                       min={2}
-                      max={200}
+                      max={activeDataset.descriptors}
                       step={1}
                       onChange={(v) => onSettingsChange({ maxVarsModel: v })}
                     />
                   </Group>
                   <Group grow>
-                    <NumberFieldWithTooltip
+                    <SliderFieldWithTooltip
                       label="Population size"
                       help="Number of models in each generation of the genetic algorithm. Larger populations explore the search space better but increase computation time."
                       value={selectionSettings.populationSize}
-                      min={20}
+                      min={2}
                       max={300}
                       step={1}
                       onChange={(v) => onSettingsChange({ populationSize: v })}
                     />
-                    <NumberFieldWithTooltip
+                    <SliderFieldWithTooltip
                       label="Generations"
                       help="Number of generations to evolve in the genetic algorithm. More generations improve convergence but require longer computation."
                       value={selectionSettings.generations}
-                      min={10}
+                      min={1}
                       max={500}
                       step={1}
                       onChange={(v) => onSettingsChange({ generations: v })}
