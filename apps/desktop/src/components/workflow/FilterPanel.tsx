@@ -1,10 +1,11 @@
-import { Box, Button, Checkbox, Group, Paper, Stack, Text } from "@mantine/core";
-import { IconFilter } from "@tabler/icons-react";
+import { Box, Button, Checkbox, Paper, Stack, Text } from "@mantine/core";
+import { IconFilter, IconX, IconCheck } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import { ExpandableSection } from "../ui/ExpandableSection";
 import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
 import type { DatasetProfile, FilterSettings } from "../../lib/mockQsarBackend";
+import { StatsRing } from "../ui/StatsRing";
 
 type FilterPanelProps = {
   uploadedDataset: DatasetProfile | null;
@@ -16,7 +17,7 @@ type FilterPanelProps = {
   onRunFilters: () => void;
 };
 
-export function FilterPanel({
+export function FilterPanel ({
   uploadedDataset,
   activeDataset,
   filterSettings,
@@ -122,24 +123,24 @@ export function FilterPanel({
         </Text>
       )}
 
-      {isComplete && (
+      {uploadedDataset && activeDataset && isComplete && (
         <ResultCard title="Filters applied successfully">
-          <Group grow>
-            <Box>
-              <Text size="xs" c="dimmed">
-                Active descriptors:
-              </Text>
-              <Text fw={600}>{activeDataset?.descriptors}</Text>
-            </Box>
-            <Box>
-              <Text size="xs" c="dimmed">
-                Removed:
-              </Text>
-              <Text fw={600}>
-                {uploadedDataset ? uploadedDataset.descriptors - (activeDataset?.descriptors ?? 0) : 0}
-              </Text>
-            </Box>
-          </Group>
+          <StatsRing stats={[
+            {
+              label: "Active descriptors",
+              stats: activeDataset.descriptors.toString(),
+              progress: (activeDataset.descriptors / uploadedDataset.descriptors) * 100,
+              color: "blue",
+              icon: <IconCheck />,
+            },
+            {
+              label: "Removed",
+              stats: (uploadedDataset.descriptors - activeDataset.descriptors).toString(),
+              progress: (1 - activeDataset.descriptors / uploadedDataset.descriptors) * 100,
+              color: "red",
+              icon: <IconX />,
+            },
+          ]} />
         </ResultCard>
       )}
     </StepCard>

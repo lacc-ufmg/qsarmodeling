@@ -1,9 +1,10 @@
-import { Box, Button, FileInput, Group, Stack, Text } from "@mantine/core";
-import { IconDatabase, IconUpload } from "@tabler/icons-react";
+import { Box, Button, FileInput, Group, Stack } from "@mantine/core";
+import { IconDatabase, IconUpload, IconLayoutRows, IconLayoutColumns } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import type { DatasetProfile } from "../../lib/mockQsarBackend";
 import { TooltipLabel } from "../ui/HelpTooltip";
+import { StatsRing } from "../ui/StatsRing";
 
 type LoadDataPanelProps = {
   matrixFile: File | null;
@@ -16,7 +17,7 @@ type LoadDataPanelProps = {
   onLoad: () => void;
 };
 
-export function LoadDataPanel({
+export function LoadDataPanel ({
   matrixFile,
   vectorFile,
   uploadedDataset,
@@ -77,20 +78,22 @@ export function LoadDataPanel({
 
       {uploadedDataset && (
         <ResultCard title="Dataset loaded successfully">
-          <Group justify="space-evenly" align="center">
-            <Box style={{textAlign: "center"}}>
-              <Text size="xs" c="dimmed">
-                Loaded rows ({uploadedDataset.matrixName}, {uploadedDataset.vectorName})
-              </Text>
-              <Text fw={600}>{uploadedDataset.rows} samples</Text>
-            </Box>
-            <Box style={{textAlign: "center"}}>
-              <Text size="xs" c="dimmed">
-                Loaded columns ({uploadedDataset.matrixName})
-              </Text>
-              <Text fw={600}>{uploadedDataset.descriptors} features</Text>
-            </Box>
-          </Group>
+          <StatsRing stats={[
+            {
+              label: "Samples",
+              stats: uploadedDataset.rows.toString(),
+              progress: (uploadedDataset.rows / (uploadedDataset.rows + uploadedDataset.descriptors)) * 100,
+              color: "blue",
+              icon: <IconLayoutRows />,
+            },
+            {
+              label: "Descriptors",
+              stats: uploadedDataset.descriptors.toString(),
+              progress: (uploadedDataset.descriptors / (uploadedDataset.rows + uploadedDataset.descriptors)) * 100,
+              color: "teal",
+              icon: <IconLayoutColumns />,
+            },
+          ]} />
         </ResultCard>
       )}
     </StepCard>

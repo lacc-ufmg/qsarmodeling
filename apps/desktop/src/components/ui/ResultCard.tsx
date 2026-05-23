@@ -7,7 +7,7 @@ type ResultCardProps = {
   children: ReactNode;
 };
 
-export function ResultCard({ title, children }: ResultCardProps) {
+export function ResultCard ({ title, children }: ResultCardProps) {
   return (
     <Box mt="md">
       <Divider my="sm" />
@@ -19,7 +19,11 @@ export function ResultCard({ title, children }: ResultCardProps) {
           {title}
         </Text>
       </Group>
-      <Box>{children}</Box>
+      <Box>
+        <Group grow justify="space-evenly" align="center">
+          {children}
+        </Group>
+      </Box>
     </Box>
   );
 }
