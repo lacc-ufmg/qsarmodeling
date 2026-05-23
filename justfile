@@ -7,3 +7,11 @@ dev:
 alias b := build
 build:
     turbo run "desktop#build"
+
+[working-directory("apps/desktop")]
+vitedev:
+    pnpm vite
+
+[working-directory("apps/desktop")]
+tauridev:
+    pnpm run tauri dev

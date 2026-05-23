@@ -5,6 +5,7 @@ import { ResultCard } from "../ui/ResultCard";
 import { ExpandableSection } from "../ui/ExpandableSection";
 import { NumberFieldWithTooltip } from "../ui/NumberFieldWithTooltip";
 import type { SelectionResult, SelectionSettings } from "../../lib/mockQsarBackend";
+import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
 
 type SelectionPanelProps = {
   activeDataset: boolean;
@@ -105,12 +106,12 @@ export function SelectionPanel({
           >
             <Stack gap="md">
               {isOps ? (
-                <NumberFieldWithTooltip
+                <SliderFieldWithTooltip
                   label="Variables percentage"
                   help="Percentage of descriptors to evaluate during OPS selection. Lower values reduce search space but may miss optimal features."
                   value={selectionSettings.varsPercentage}
                   min={1}
-                  max={60}
+                  max={100}
                   step={1}
                   onChange={(v) => onSettingsChange({ varsPercentage: v })}
                 />

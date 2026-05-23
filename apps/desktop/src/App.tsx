@@ -18,25 +18,27 @@ import { FilterPanel } from "./components/workflow/FilterPanel";
 import { SelectionPanel } from "./components/workflow/SelectionPanel";
 import { ValidationPanel } from "./components/workflow/ValidationPanel";
 import { WorkflowTimeline } from "./components/workflow/WorkflowTimeline";
+import icon from "./assets/icon.png";
+// import { app, core } from "@tauri-apps/api"
 
 export default function App() {
   const { toggleColorScheme } = useMantineColorScheme();
   const { state, actions, selectors } = useQsarWorkflow();
-
+  // const version = app.getVersion();
+  // const bundleType = app.getBundleType();
   return (
     <AppShell header={{ height: 78 }} padding="lg">
       <AppShell.Header>
-        <Container size="lg" h="100%">
+        <Container size="md" h="100%">
           <Group h="100%" justify="space-between">
             <Group gap="md" align="center">
-              <ThemeIcon radius="md" size="lg" variant="light" color="teal">
-                <IconFlask size={18} />
-              </ThemeIcon>
+              <img src={icon} alt="App Icon" width={48} />
               <Box>
+                <Text fw={700}>QSAR Modeling</Text>
                 <Text size="xs" tt="uppercase" fw={600} c="dimmed">
-                  Guided workflow
+                  v0.2.0
+                  {/* {version} ({bundleType}) */}
                 </Text>
-                <Text fw={700}>QSAR Model Builder</Text>
               </Box>
             </Group>
             <ColorSchemeToggle onToggle={toggleColorScheme} />
@@ -50,15 +52,13 @@ export default function App() {
             {/* Hero Section */}
             <Box>
               <Text c="blue" fw={600} tt="uppercase" lts={2} size="sm">
-                Guided workflow
+                Quantitative Activity-Structure Relationship Modeling
               </Text>
-              <Title order={1} mt="xs">
-                QSAR Model Builder
+              <Title order={1} mt="lg">
+                Guided Workflow
               </Title>
               <Text c="dimmed" mt="sm">
-                A guided workflow for QSAR model development. Follow the steps in order,
-                and we&apos;ll help you at each stage with sensible defaults and detailed
-                explanations.
+                Turn the structural descriptors and activity data of your chemical dataset into predictive QSAR models in just a few clicks. Follow the step-by-step workflow to load your data, filter descriptors, select variables, and validate your models. No coding required!
               </Text>
             </Box>
 
@@ -98,7 +98,7 @@ export default function App() {
 
             {/* Step 3: Select Variables */}
             <SelectionPanel
-              activeDataset={Boolean(state.activeDataset)}
+              activeDataset={state.activeDataset}
               selectionResult={state.selectionResult}
               selectionSettings={state.selectionSettings}
               isLoading={state.busyState === "selecting"}

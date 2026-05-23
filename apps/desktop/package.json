@@ -6,6 +6,7 @@
   "scripts": {
     "sync-sidecar": "node scripts/sync-backend-sidecar.mjs",
     "dev": "vite",
+    "vitebuild": "vite build",
     "build": "tauri build",
     "tauri": "tauri"
   },

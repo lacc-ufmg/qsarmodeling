@@ -3,6 +3,7 @@ import { IconDatabase, IconUpload } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import type { DatasetProfile } from "../../lib/mockQsarBackend";
+import { TooltipLabel } from "../ui/HelpTooltip";
 
 type LoadDataPanelProps = {
   matrixFile: File | null;
@@ -36,7 +37,12 @@ export function LoadDataPanel({
       <Stack>
         <Group grow>
           <FileInput
-            label="X matrix (.csv)"
+            label={
+              <TooltipLabel
+                label="Structural descriptors matrix (X.csv)"
+                help="Upload the CSV file containing the descriptor matrix. Each row should correspond to a chemical compound, and each column should represent a descriptor. The file should not contain the target variable (y) or any non-numeric data. X should have the same number of rows as the y vector file."
+              />
+            }
             placeholder="Choose file"
             accept=".csv"
             value={matrixFile}
@@ -44,7 +50,12 @@ export function LoadDataPanel({
             leftSection={<IconUpload size="1rem" />}
           />
           <FileInput
-            label="y vector (.csv)"
+            label={
+              <TooltipLabel
+                label="Activity vector (y.csv)"
+                help="Upload the CSV file containing the target variable (y). Each row should correspond to a chemical compound on X, and the value should be a number representing the activity or property you want to predict. y should have the same number of rows as the X matrix file."
+              />
+            }
             placeholder="Choose file"
             accept=".csv"
             value={vectorFile}
@@ -66,26 +77,18 @@ export function LoadDataPanel({
 
       {uploadedDataset && (
         <ResultCard title="Dataset loaded successfully">
-          <Group grow>
-            <Box>
+          <Group justify="space-evenly" align="center">
+            <Box style={{textAlign: "center"}}>
               <Text size="xs" c="dimmed">
-                Rows:
+                Loaded rows ({uploadedDataset.matrixName}, {uploadedDataset.vectorName})
               </Text>
-              <Text fw={600}>{uploadedDataset.rows}</Text>
+              <Text fw={600}>{uploadedDataset.rows} samples</Text>
             </Box>
-            <Box>
+            <Box style={{textAlign: "center"}}>
               <Text size="xs" c="dimmed">
-                Descriptors:
+                Loaded columns ({uploadedDataset.matrixName})
               </Text>
-              <Text fw={600}>{uploadedDataset.descriptors}</Text>
-            </Box>
-            <Box>
-              <Text size="xs" c="dimmed">
-                Files:
-              </Text>
-              <Text fw={600} size="sm">
-                {uploadedDataset.matrixName}, {uploadedDataset.vectorName}
-              </Text>
+              <Text fw={600}>{uploadedDataset.descriptors} features</Text>
             </Box>
           </Group>
         </ResultCard>

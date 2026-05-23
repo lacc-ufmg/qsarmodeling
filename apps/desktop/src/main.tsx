@@ -1,15 +1,10 @@
 import "@mantine/core/styles.css";
-import { MantineProvider, createTheme, localStorageColorSchemeManager } from "@mantine/core";
+import { MantineProvider, localStorageColorSchemeManager } from "@mantine/core";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { theme } from "./theme";
 
-const theme = createTheme({
-  fontFamily: "'IBM Plex Sans', 'Segoe UI', sans-serif",
-  headings: { fontFamily: "'Space Grotesk', 'IBM Plex Sans', sans-serif" },
-  primaryColor: "teal",
-  defaultRadius: "md",
-});
 
 const colorSchemeManager = localStorageColorSchemeManager({ key: "qsar-color-scheme" });
 

@@ -6,14 +6,14 @@
   "build": {
     "beforeDevCommand": "pnpm sync-sidecar && pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm sync-sidecar",
-    "frontendDist": "../../frontend/out"
+    "beforeBuildCommand": "pnpm sync-sidecar && pnpm run vitebuild",
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
         "title": "QSAR Modeling",
-        "width": 1280,
+        "width": 1080,
         "height": 800,
         "minWidth": 900,
         "minHeight": 600,

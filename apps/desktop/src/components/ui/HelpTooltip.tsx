@@ -1,5 +1,6 @@
 import { ActionIcon, Tooltip } from "@mantine/core";
 import { IconQuestionMark } from "@tabler/icons-react";
+import { Group } from "@mantine/core";
 
 type HelpTooltipProps = {
   text: string;
@@ -18,5 +19,14 @@ export function HelpTooltip({ text }: HelpTooltipProps) {
         <IconQuestionMark size="0.8rem" />
       </ActionIcon>
     </Tooltip>
+  );
+}
+
+export function TooltipLabel({ label, help }: { label: React.ReactNode|string; help: string }) {
+  return (
+        <Group gap="xs">
+          {label}
+          <HelpTooltip text={help} />
+        </Group>
   );
 }

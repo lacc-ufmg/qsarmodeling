@@ -10,6 +10,7 @@ type SliderFieldWithTooltipProps = {
   step: number;
   onChange: (value: number) => void;
   inverted?: boolean;
+  sliderLabel?: (value: number) => string;
 };
 
 export function SliderFieldWithTooltip({
@@ -21,6 +22,7 @@ export function SliderFieldWithTooltip({
   step,
   onChange,
   inverted,
+  sliderLabel = String,
 }: SliderFieldWithTooltipProps) {
   return (
     <Box>
@@ -32,7 +34,7 @@ export function SliderFieldWithTooltip({
       </Group>
       <Group gap="md">
         <Slider
-          label={(sliderValue) => sliderValue.toString()}
+          label={sliderLabel}
           inverted={inverted}
           value={value}
           min={min}
