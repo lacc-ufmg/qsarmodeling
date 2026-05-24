@@ -15,6 +15,7 @@ vitedev:
 [working-directory("apps/desktop")]
 tauridev:
     pnpm run tauri dev
+alias td := tauridev
 
 # Usage: just bump <major|minor|patch> [MESSAGE]
 [arg('notag', long="notag", value="notag", help="Don't create a git tag for the old version.")]

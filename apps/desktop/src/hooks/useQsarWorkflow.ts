@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import type {
   DatasetProfile,
   FilterSettings,
@@ -23,8 +24,8 @@ import {
 } from "../lib/workflowClient";
 
 type WorkflowState = {
-  matrixFile: File | null;
-  vectorFile: File | null;
+  matrixFilePath: string | null;
+  vectorFilePath: string | null;
   uploadedDataset: DatasetProfile | null;
   activeDataset: DatasetProfile | null;
   selectionResult: SelectionResult | null;
@@ -92,8 +93,8 @@ function mergeSnapshot(current: WorkflowSnapshot, next: Partial<WorkflowSnapshot
 }
 
 export function useQsarWorkflow() {
-  const [matrixFile, setMatrixFile] = useState<File | null>(null);
-  const [vectorFile, setVectorFile] = useState<File | null>(null);
+  const [matrixFilePath, setMatrixFilePath] = useState<string | null>(null);
+  const [vectorFilePath, setVectorFilePath] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<WorkflowSnapshot>(initialSnapshot);
 
   useEffect(() => {
@@ -162,16 +163,50 @@ export function useQsarWorkflow() {
     }
   }, []);
 
-  const setMatrixFileAction = useCallback((file: File | null) => {
-    setMatrixFile(file);
+  const selectMatrixFile = useCallback(async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+      });
+      if (selected && typeof selected === "string") {
+        setMatrixFilePath(selected);
+      }
+    } catch (error) {
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(error, "Failed to select matrix file."),
+      }));
+    }
   }, []);
 
-  const setVectorFileAction = useCallback((file: File | null) => {
-    setVectorFile(file);
+  const selectVectorFile = useCallback(async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+      });
+      if (selected && typeof selected === "string") {
+        setVectorFilePath(selected);
+      }
+    } catch (error) {
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(error, "Failed to select vector file."),
+      }));
+    }
+  }, []);
+
+  const clearMatrixFile = useCallback(() => {
+    setMatrixFilePath(null);
+  }, []);
+
+  const clearVectorFile = useCallback(() => {
+    setVectorFilePath(null);
   }, []);
 
   const loadData = useCallback(async () => {
-    if (!matrixFile || !vectorFile) {
+    if (!matrixFilePath || !vectorFilePath) {
       setSnapshot((current) => ({
         ...current,
         error: "Select both X matrix and y vector files before loading.",
@@ -180,7 +215,7 @@ export function useQsarWorkflow() {
     }
 
     try {
-      const loaded = await invokeLoadDataset(matrixFile, vectorFile);
+      const loaded = await invokeLoadDataset(matrixFilePath, vectorFilePath);
       setSnapshot(loaded);
     } catch (loadError) {
       setSnapshot((current) => ({
@@ -188,7 +223,7 @@ export function useQsarWorkflow() {
         error: toErrorMessage(loadError, "Failed to load dataset."),
       }));
     }
-  }, [matrixFile, vectorFile]);
+  }, [matrixFilePath, vectorFilePath]);
 
   const runDescriptorFilters = useCallback(async () => {
     if (!snapshot.uploadedDataset) {
@@ -239,7 +274,7 @@ export function useQsarWorkflow() {
   }, [snapshot.uploadedDataset]);
 
   const runFullPipeline = useCallback(async () => {
-    if (!matrixFile || !vectorFile) {
+    if (!matrixFilePath || !vectorFilePath) {
       setSnapshot((current) => ({
         ...current,
         error: "Select both X matrix and y vector files before running the full pipeline.",
@@ -248,7 +283,7 @@ export function useQsarWorkflow() {
     }
 
     try {
-      const loaded = await invokeLoadDataset(matrixFile, vectorFile);
+      const loaded = await invokeLoadDataset(matrixFilePath, vectorFilePath);
       setSnapshot(loaded);
 
       const pipeline = await invokeRunPipeline();
@@ -259,19 +294,19 @@ export function useQsarWorkflow() {
         error: toErrorMessage(pipelineError, "Failed to run the full pipeline."),
       }));
     }
-  }, [matrixFile, vectorFile]);
+  }, [matrixFilePath, vectorFilePath]);
 
   const isIdle = snapshot.busyState === "idle";
-  const canLoadData = Boolean(matrixFile && vectorFile) && isIdle;
+  const canLoadData = Boolean(matrixFilePath && vectorFilePath) && isIdle;
   const canRunFilters = Boolean(snapshot.activeDataset) && isIdle;
   const canRunSelection = Boolean(snapshot.activeDataset) && isIdle;
   const canRunValidation = Boolean(snapshot.selectionResult) && isIdle;
-  const canRunPipeline = Boolean(matrixFile && vectorFile) && isIdle;
+  const canRunPipeline = Boolean(matrixFilePath && vectorFilePath) && isIdle;
 
   const state = useMemo<WorkflowState>(
     () => ({
-      matrixFile,
-      vectorFile,
+      matrixFilePath,
+      vectorFilePath,
       uploadedDataset: snapshot.uploadedDataset,
       activeDataset: snapshot.activeDataset,
       selectionResult: snapshot.selectionResult,
@@ -283,14 +318,16 @@ export function useQsarWorkflow() {
       selectionSettings: snapshot.selectionSettings,
       validationSettings: snapshot.validationSettings,
     }),
-    [matrixFile, snapshot, vectorFile],
+    [matrixFilePath, snapshot, vectorFilePath],
   );
 
   return {
     state,
     actions: {
-      setMatrixFile: setMatrixFileAction,
-      setVectorFile: setVectorFileAction,
+      selectMatrixFile,
+      selectVectorFile,
+      clearMatrixFile,
+      clearVectorFile,
       updateFilterSettings,
       updateSelectionSettings,
       updateValidationSettings,

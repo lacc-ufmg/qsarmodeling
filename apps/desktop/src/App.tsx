@@ -82,13 +82,15 @@ export default function App () {
 
             {/* Step 1: Load Data */}
             <LoadDataPanel
-              matrixFile={state.matrixFile}
-              vectorFile={state.vectorFile}
+              matrixFilePath={state.matrixFilePath}
+              vectorFilePath={state.vectorFilePath}
               uploadedDataset={state.uploadedDataset}
               isLoading={state.busyState === "loading-data"}
               isDisabled={!selectors.canLoadData}
-              onMatrixFileChange={actions.setMatrixFile}
-              onVectorFileChange={actions.setVectorFile}
+              onSelectMatrixFile={actions.selectMatrixFile}
+              onSelectVectorFile={actions.selectVectorFile}
+              onClearMatrixFile={actions.clearMatrixFile}
+              onClearVectorFile={actions.clearVectorFile}
               onLoad={actions.loadData}
             />
 

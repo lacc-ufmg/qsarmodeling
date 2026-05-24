@@ -1,10 +1,9 @@
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine;
 use chrono::Local;
-use reqwest::multipart;
+use qsarmodelingrs::load_dataset as qsar_load_dataset;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
+use uuid::Uuid;
 
 const DEFAULT_API_BASE: &str = "http://127.0.0.1:27051";
 
@@ -114,10 +113,8 @@ pub struct ExternalValidationResult {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoadDatasetInput {
-    pub matrix_name: String,
-    pub matrix_base64: String,
-    pub vector_name: String,
-    pub vector_base64: String,
+    pub matrix_path: String,
+    pub vector_path: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -250,7 +247,10 @@ impl WorkflowSession {
     }
 
     fn append_history(&mut self, message: impl Into<String>) {
-        self.history.insert(0, format!("{} - {}", Local::now().format("%H:%M:%S"), message.into()));
+        self.history.insert(
+            0,
+            format!("{} - {}", Local::now().format("%H:%M:%S"), message.into()),
+        );
         self.history.truncate(8);
     }
 
@@ -350,48 +350,15 @@ fn apply_validation_patch(session: &mut WorkflowSession, patch: ValidationSettin
     }
 }
 
-fn decode_base64_payload(input: &str) -> Result<Vec<u8>, String> {
-    STANDARD.decode(input.as_bytes()).map_err(|error| error.to_string())
-}
-
 fn set_busy_state(session: &mut WorkflowSession, busy_state: BusyState) {
     session.busy_state = busy_state;
     session.error = None;
 }
 
-async fn post_multipart_load(input: LoadDatasetInput) -> Result<DatasetProfile, String> {
-    let client = reqwest::Client::new();
-    let form = multipart::Form::new()
-        .part(
-            "matrix_file",
-            multipart::Part::bytes(decode_base64_payload(&input.matrix_base64)?).file_name(input.matrix_name),
-        )
-        .part(
-            "vector_file",
-            multipart::Part::bytes(decode_base64_payload(&input.vector_base64)?).file_name(input.vector_name),
-        );
-
-    let response = client
-        .post(format!("{}/load", backend_base_url()))
-        .multipart(form)
-        .send()
-        .await
-        .map_err(|error| error.to_string())?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        return Err(if body.is_empty() {
-            format!("Backend request failed with status {}", status)
-        } else {
-            body
-        });
-    }
-
-    response.json::<DatasetProfile>().await.map_err(|error| error.to_string())
-}
-
-async fn post_json<T: Serialize, R: for<'de> Deserialize<'de>>(path: &str, payload: &T) -> Result<R, String> {
+async fn post_json<T: Serialize, R: for<'de> Deserialize<'de>>(
+    path: &str,
+    payload: &T,
+) -> Result<R, String> {
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{}{}", backend_base_url(), path))
@@ -410,7 +377,10 @@ async fn post_json<T: Serialize, R: for<'de> Deserialize<'de>>(path: &str, paylo
         });
     }
 
-    response.json::<R>().await.map_err(|error| error.to_string())
+    response
+        .json::<R>()
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -480,19 +450,45 @@ pub async fn load_dataset(
         emit_snapshot(&app, &snapshot)?;
     }
 
-    let loaded_dataset = match post_multipart_load(input).await {
-        Ok(dataset) => dataset,
-        Err(error) => {
-            let snapshot = {
-                let mut session = state.session.lock().map_err(|lock_error| lock_error.to_string())?;
-                session.busy_state = BusyState::Idle;
-                session.error = Some(error.clone());
-                session.snapshot()
-            };
-            emit_snapshot(&app, &snapshot)?;
-            return Err(error);
+    // Load dataset directly from file paths using qsarmodelingrs
+    let loaded_dataset = (|| -> Result<DatasetProfile, String> {
+        let matrix_path = std::path::PathBuf::from(&input.matrix_path);
+        let vector_path = std::path::PathBuf::from(&input.vector_path);
+
+        // Validate that files exist
+        if !matrix_path.exists() {
+            return Err(format!("Matrix file not found: {}", input.matrix_path));
         }
-    };
+        if !vector_path.exists() {
+            return Err(format!("Vector file not found: {}", input.vector_path));
+        }
+
+        // Load using qsarmodelingrs
+        let (matrix, _y) =
+            qsar_load_dataset(&matrix_path, &vector_path).map_err(|e| e.to_string())?;
+
+        let session_id = Uuid::new_v4().to_string();
+        let matrix_name = matrix_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("matrix.csv")
+            .to_string();
+        let vector_name = vector_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("vector.csv")
+            .to_string();
+
+        Ok(DatasetProfile {
+            session_id: session_id.clone(),
+            id: session_id.clone(),
+            matrix_name,
+            vector_name,
+            rows: matrix.frame.height() as u32,
+            descriptors: matrix.frame.width() as u32,
+            source: "Local".to_string(),
+        })
+    })()?;
 
     let snapshot = {
         let mut session = state.session.lock().map_err(|error| error.to_string())?;
@@ -501,7 +497,10 @@ pub async fn load_dataset(
         session.clear_results();
         session.busy_state = BusyState::Idle;
         session.error = None;
-        session.append_history(format!("Loaded dataset ({} rows, {} descriptors).", loaded_dataset.rows, loaded_dataset.descriptors));
+        session.append_history(format!(
+            "Loaded dataset ({} rows, {} descriptors).",
+            loaded_dataset.rows, loaded_dataset.descriptors
+        ));
         session.snapshot()
     };
 
@@ -557,7 +556,10 @@ pub async fn run_descriptor_filters(
         Ok(dataset) => dataset,
         Err(error) => {
             let snapshot = {
-                let mut session = state.session.lock().map_err(|lock_error| lock_error.to_string())?;
+                let mut session = state
+                    .session
+                    .lock()
+                    .map_err(|lock_error| lock_error.to_string())?;
                 session.busy_state = BusyState::Idle;
                 session.error = Some(error.clone());
                 session.snapshot()
@@ -628,7 +630,10 @@ pub async fn run_variable_selection(
         Ok(result) => result,
         Err(error) => {
             let snapshot = {
-                let mut session = state.session.lock().map_err(|lock_error| lock_error.to_string())?;
+                let mut session = state
+                    .session
+                    .lock()
+                    .map_err(|lock_error| lock_error.to_string())?;
                 session.busy_state = BusyState::Idle;
                 session.error = Some(error.clone());
                 session.snapshot()
@@ -700,7 +705,10 @@ pub async fn run_validation_suite(
         Ok(result) => result,
         Err(error) => {
             let snapshot = {
-                let mut session = state.session.lock().map_err(|lock_error| lock_error.to_string())?;
+                let mut session = state
+                    .session
+                    .lock()
+                    .map_err(|lock_error| lock_error.to_string())?;
                 session.busy_state = BusyState::Idle;
                 session.error = Some(error.clone());
                 session.snapshot()
@@ -778,7 +786,10 @@ pub async fn run_full_pipeline(
         Ok(result) => result,
         Err(error) => {
             let snapshot = {
-                let mut session = state.session.lock().map_err(|lock_error| lock_error.to_string())?;
+                let mut session = state
+                    .session
+                    .lock()
+                    .map_err(|lock_error| lock_error.to_string())?;
                 session.busy_state = BusyState::Idle;
                 session.error = Some(error.clone());
                 session.snapshot()

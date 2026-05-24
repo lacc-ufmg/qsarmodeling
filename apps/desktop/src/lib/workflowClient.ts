@@ -30,31 +30,6 @@ export type SelectionSettingsPatch = Partial<Omit<SelectionSettings, "method">> 
 };
 export type ValidationSettingsPatch = Partial<ValidationSettings>;
 
-type WorkflowFilePayload = {
-  name: string;
-  base64: string;
-};
-
-function bufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  const chunkSize = 0x8000;
-
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-
-  return btoa(binary);
-}
-
-async function fileToPayload(file: File): Promise<WorkflowFilePayload> {
-  return {
-    name: file.name,
-    base64: bufferToBase64(await file.arrayBuffer()),
-  };
-}
-
 export async function getWorkflowSnapshot(): Promise<WorkflowSnapshot> {
   return invoke<WorkflowSnapshot>("get_workflow_snapshot");
 }
@@ -71,15 +46,11 @@ export async function updateValidationSettings(patch: ValidationSettingsPatch): 
   return invoke<WorkflowSnapshot>("update_validation_settings", { patch });
 }
 
-export async function loadDataset(matrixFile: File, vectorFile: File): Promise<WorkflowSnapshot> {
-  const [matrix, vector] = await Promise.all([fileToPayload(matrixFile), fileToPayload(vectorFile)]);
-
+export async function loadDataset(matrixPath: string, vectorPath: string): Promise<WorkflowSnapshot> {
   return invoke<WorkflowSnapshot>("load_dataset", {
     input: {
-      matrixName: matrix.name,
-      matrixBase64: matrix.base64,
-      vectorName: vector.name,
-      vectorBase64: vector.base64,
+      matrixPath,
+      vectorPath,
     },
   });
 }
