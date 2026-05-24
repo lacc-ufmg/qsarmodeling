@@ -1,28 +1,24 @@
 _default:
     @{{ quote(just_executable()) }} --list --justfile={{ quote(justfile()) }}
 
-
 dev:
     turbo run dev
-
 
 alias b := build
 build:
     turbo run "desktop#build"
 
-
 [working-directory("apps/desktop")]
 vitedev:
     pnpm vite
-
 
 [working-directory("apps/desktop")]
 tauridev:
     pnpm run tauri dev
 
-
 # Usage: just bump <major|minor|patch> [MESSAGE]
-bump level message="":
+[arg('notag', long="notag", value="notag", help="Don't create a git tag for the old version.")]
+bump level message="" notag="":
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -86,10 +82,14 @@ bump level message="":
     fi
 
     # ── 6. Tag OLD_VERSION ───────────────────────────────────────────────────
-    TAG_MSG="${MESSAGE:-v${OLD_VERSION}}"
-    git tag -a "v${OLD_VERSION}" -m "$TAG_MSG" && \
-    echo "🏷️   Tagged v${OLD_VERSION}" || \
-    echo "⚠️   Failed to tag v${OLD_VERSION}. Skipping."
+    if [[ -n "{{ notag }}" ]]; then
+        echo "⚠️   Skipping git tag for v${OLD_VERSION} (notag flag set)."
+    else
+        TAG_MSG="${MESSAGE:-v${OLD_VERSION}}"
+        git tag -a "v${OLD_VERSION}" -m "$TAG_MSG" && \
+        echo "🏷️   Tagged v${OLD_VERSION}" || \
+        echo "⚠️   Failed to tag v${OLD_VERSION}. Skipping."
+    fi
 
     # ── 7. Update version in all files ───────────────────────────────────────
 
