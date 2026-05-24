@@ -7,10 +7,9 @@ import {
   Group,
   Stack,
   Text,
-  Title,
-  ThemeIcon,
+  Title
 } from "@mantine/core";
-import { IconAlertCircle, IconFlask } from "@tabler/icons-react";
+import { IconAlertCircle } from "@tabler/icons-react";
 import { useQsarWorkflow } from "./hooks/useQsarWorkflow";
 import { ColorSchemeToggle } from "./components/ui/ColorSchemeToggle";
 import { LoadDataPanel } from "./components/workflow/LoadDataPanel";

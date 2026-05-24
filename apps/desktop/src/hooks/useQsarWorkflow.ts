@@ -1,19 +1,26 @@
-import { useCallback, useReducer } from "react";
-import {
-  type DatasetProfile,
-  type FilterSettings,
-  type SelectionResult,
-  type SelectionSettings,
-  type ValidationResult,
-  type ValidationSettings,
-  loadDataset,
-  runFilters,
-  runPipeline,
-  runSelection,
-  runValidations,
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import type {
+  DatasetProfile,
+  FilterSettings,
+  SelectionResult,
+  SelectionSettings,
+  ValidationResult,
+  ValidationSettings,
 } from "../lib/mockQsarBackend";
-
-export type BusyState = "idle" | "loading-data" | "filtering" | "selecting" | "validating";
+import {
+  getWorkflowSnapshot,
+  loadDataset as invokeLoadDataset,
+  runFilters as invokeRunFilters,
+  runPipeline as invokeRunPipeline,
+  runSelection as invokeRunSelection,
+  runValidations as invokeRunValidations,
+  updateFilterSettings as invokeUpdateFilterSettings,
+  updateSelectionSettings as invokeUpdateSelectionSettings,
+  updateValidationSettings as invokeUpdateValidationSettings,
+  type BusyState,
+  type WorkflowSnapshot,
+} from "../lib/workflowClient";
 
 type WorkflowState = {
   matrixFile: File | null;
@@ -30,23 +37,7 @@ type WorkflowState = {
   validationSettings: ValidationSettings;
 };
 
-type WorkflowAction =
-  | { type: "set-matrix-file"; file: File | null }
-  | { type: "set-vector-file"; file: File | null }
-  | { type: "set-uploaded-dataset"; dataset: DatasetProfile | null }
-  | { type: "set-active-dataset"; dataset: DatasetProfile | null }
-  | { type: "set-selection-result"; result: SelectionResult | null }
-  | { type: "set-validation-result"; result: ValidationResult | null }
-  | { type: "set-busy"; busyState: BusyState }
-  | { type: "set-error"; error: string | null }
-  | { type: "append-history"; message: string }
-  | { type: "update-filter-settings"; patch: Partial<FilterSettings> }
-  | { type: "update-selection-settings"; patch: Partial<SelectionSettings> }
-  | { type: "update-validation-settings"; patch: Partial<ValidationSettings> };
-
-const initialState: WorkflowState = {
-  matrixFile: null,
-  vectorFile: null,
+const initialSnapshot: WorkflowSnapshot = {
   uploadedDataset: null,
   activeDataset: null,
   selectionResult: null,
@@ -82,240 +73,224 @@ const initialState: WorkflowState = {
   },
 };
 
-function workflowReducer(state: WorkflowState, action: WorkflowAction): WorkflowState {
-  switch (action.type) {
-    case "set-matrix-file":
-      return { ...state, matrixFile: action.file };
-    case "set-vector-file":
-      return { ...state, vectorFile: action.file };
-    case "set-uploaded-dataset":
-      return { ...state, uploadedDataset: action.dataset };
-    case "set-active-dataset":
-      return { ...state, activeDataset: action.dataset };
-    case "set-selection-result":
-      return { ...state, selectionResult: action.result };
-    case "set-validation-result":
-      return { ...state, validationResult: action.result };
-    case "set-busy":
-      return { ...state, busyState: action.busyState };
-    case "set-error":
-      return { ...state, error: action.error };
-    case "append-history":
-      return { ...state, history: [action.message, ...state.history].slice(0, 8) };
-    case "update-filter-settings":
-      return {
-        ...state,
-        filterSettings: { ...state.filterSettings, ...action.patch },
-      };
-    case "update-selection-settings":
-      return {
-        ...state,
-        selectionSettings: { ...state.selectionSettings, ...action.patch },
-      };
-    case "update-validation-settings":
-      return {
-        ...state,
-        validationSettings: { ...state.validationSettings, ...action.patch },
-      };
-    default:
-      return state;
-  }
-}
-
 function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function mergeSnapshot(current: WorkflowSnapshot, next: Partial<WorkflowSnapshot>): WorkflowSnapshot {
+  return {
+    ...current,
+    ...next,
+    filterSettings: next.filterSettings ? { ...current.filterSettings, ...next.filterSettings } : current.filterSettings,
+    selectionSettings: next.selectionSettings
+      ? { ...current.selectionSettings, ...next.selectionSettings }
+      : current.selectionSettings,
+    validationSettings: next.validationSettings
+      ? { ...current.validationSettings, ...next.validationSettings }
+      : current.validationSettings,
+  };
+}
+
 export function useQsarWorkflow() {
-  const [state, dispatch] = useReducer(workflowReducer, initialState);
+  const [matrixFile, setMatrixFile] = useState<File | null>(null);
+  const [vectorFile, setVectorFile] = useState<File | null>(null);
+  const [snapshot, setSnapshot] = useState<WorkflowSnapshot>(initialSnapshot);
 
-  const setMatrixFile = useCallback((file: File | null) => {
-    dispatch({ type: "set-matrix-file", file });
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let active = true;
+
+    void (async () => {
+      try {
+        const currentSnapshot = await getWorkflowSnapshot();
+        if (active) {
+          setSnapshot(currentSnapshot);
+        }
+
+        unlisten = await listen<WorkflowSnapshot>("workflow:state-updated", (event) => {
+          setSnapshot((current) => mergeSnapshot(current, event.payload));
+        });
+      } catch (error) {
+        if (active) {
+          setSnapshot((current) => ({
+            ...current,
+            error: toErrorMessage(error, "Failed to load workflow state."),
+          }));
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+      void unlisten?.();
+    };
   }, []);
 
-  const setVectorFile = useCallback((file: File | null) => {
-    dispatch({ type: "set-vector-file", file });
+  const updateFilterSettings = useCallback(async (patch: Partial<FilterSettings>) => {
+    try {
+      const nextSnapshot = await invokeUpdateFilterSettings(patch);
+      setSnapshot(nextSnapshot);
+    } catch (error) {
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(error, "Failed to update filter settings."),
+      }));
+    }
   }, []);
 
-  const updateFilterSettings = useCallback((patch: Partial<FilterSettings>) => {
-    dispatch({ type: "update-filter-settings", patch });
+  const updateSelectionSettings = useCallback(async (patch: Partial<SelectionSettings>) => {
+    try {
+      const nextSnapshot = await invokeUpdateSelectionSettings(patch);
+      setSnapshot(nextSnapshot);
+    } catch (error) {
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(error, "Failed to update selection settings."),
+      }));
+    }
   }, []);
 
-  const updateSelectionSettings = useCallback((patch: Partial<SelectionSettings>) => {
-    dispatch({ type: "update-selection-settings", patch });
+  const updateValidationSettings = useCallback(async (patch: Partial<ValidationSettings>) => {
+    try {
+      const nextSnapshot = await invokeUpdateValidationSettings(patch);
+      setSnapshot(nextSnapshot);
+    } catch (error) {
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(error, "Failed to update validation settings."),
+      }));
+    }
   }, []);
 
-  const updateValidationSettings = useCallback((patch: Partial<ValidationSettings>) => {
-    dispatch({ type: "update-validation-settings", patch });
+  const setMatrixFileAction = useCallback((file: File | null) => {
+    setMatrixFile(file);
   }, []);
 
-  const setBusyState = useCallback((busyState: BusyState) => {
-    dispatch({ type: "set-busy", busyState });
-  }, []);
-
-  const setError = useCallback((error: string | null) => {
-    dispatch({ type: "set-error", error });
-  }, []);
-
-  const appendHistory = useCallback((message: string) => {
-    dispatch({
-      type: "append-history",
-      message: `${new Date().toLocaleTimeString()} - ${message}`,
-    });
+  const setVectorFileAction = useCallback((file: File | null) => {
+    setVectorFile(file);
   }, []);
 
   const loadData = useCallback(async () => {
-    const { matrixFile, vectorFile } = state;
-
     if (!matrixFile || !vectorFile) {
-      setError("Select both X matrix and y vector files before loading.");
+      setSnapshot((current) => ({
+        ...current,
+        error: "Select both X matrix and y vector files before loading.",
+      }));
       return;
     }
 
-    setError(null);
-    setBusyState("loading-data");
-
     try {
-      const loaded = await loadDataset(matrixFile, vectorFile);
-      dispatch({ type: "set-uploaded-dataset", dataset: loaded });
-      dispatch({ type: "set-active-dataset", dataset: loaded });
-      dispatch({ type: "set-selection-result", result: null });
-      dispatch({ type: "set-validation-result", result: null });
-      appendHistory(`Loaded dataset (${loaded.rows} rows, ${loaded.descriptors} descriptors).`);
+      const loaded = await invokeLoadDataset(matrixFile, vectorFile);
+      setSnapshot(loaded);
     } catch (loadError) {
-      setError(toErrorMessage(loadError, "Failed to load dataset."));
-    } finally {
-      setBusyState("idle");
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(loadError, "Failed to load dataset."),
+      }));
     }
-  }, [appendHistory, setBusyState, setError, state, state.matrixFile, state.vectorFile]);
+  }, [matrixFile, vectorFile]);
 
   const runDescriptorFilters = useCallback(async () => {
-    if (!state.uploadedDataset) {
+    if (!snapshot.uploadedDataset) {
       return;
     }
 
-    setError(null);
-    setBusyState("filtering");
-
     try {
-      const filtered = await runFilters(state.uploadedDataset.sessionId, state.filterSettings);
-      dispatch({ type: "set-active-dataset", dataset: filtered });
-      dispatch({ type: "set-selection-result", result: null });
-      dispatch({ type: "set-validation-result", result: null });
-      appendHistory(
-        `Applied descriptor filters. Active matrix now has ${filtered.descriptors} descriptors.`,
-      );
+      const nextSnapshot = await invokeRunFilters();
+      setSnapshot(nextSnapshot);
     } catch (filterError) {
-      setError(toErrorMessage(filterError, "Failed to run descriptor filters."));
-    } finally {
-      setBusyState("idle");
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(filterError, "Failed to run descriptor filters."),
+      }));
     }
-  }, [appendHistory, setBusyState, setError, state.filterSettings, state.uploadedDataset]);
+  }, [snapshot.uploadedDataset]);
 
   const runVariableSelection = useCallback(async () => {
-    if (!state.uploadedDataset) {
+    if (!snapshot.uploadedDataset) {
       return;
     }
 
-    setError(null);
-    setBusyState("selecting");
-
     try {
-      const selected = await runSelection(
-        state.uploadedDataset.sessionId,
-        state.filterSettings,
-        state.selectionSettings,
-      );
-      dispatch({ type: "set-selection-result", result: selected });
-      dispatch({ type: "set-validation-result", result: null });
-      appendHistory(
-        `${selected.method.toUpperCase()} selected ${selected.selectedDescriptors} descriptors (Q2 ${selected.q2.toFixed(
-          3,
-        )}).`,
-      );
+      const nextSnapshot = await invokeRunSelection();
+      setSnapshot(nextSnapshot);
     } catch (selectionError) {
-      setError(toErrorMessage(selectionError, "Failed to run variable selection."));
-    } finally {
-      setBusyState("idle");
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(selectionError, "Failed to run variable selection."),
+      }));
     }
-  }, [appendHistory, setBusyState, setError, state.filterSettings, state.selectionSettings, state.uploadedDataset]);
+  }, [snapshot.uploadedDataset]);
 
   const runValidationSuite = useCallback(async () => {
-    if (!state.uploadedDataset) {
+    if (!snapshot.selectionResult) {
       return;
     }
 
-    setError(null);
-    setBusyState("validating");
-
     try {
-      const results = await runValidations(state.uploadedDataset.sessionId, state.validationSettings);
-      dispatch({ type: "set-validation-result", result: results });
-      appendHistory("Validation suite completed.");
+      const nextSnapshot = await invokeRunValidations();
+      setSnapshot(nextSnapshot);
     } catch (validationError) {
-      setError(toErrorMessage(validationError, "Failed to run validations."));
-    } finally {
-      setBusyState("idle");
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(validationError, "Failed to run validations."),
+      }));
     }
-  }, [appendHistory, setBusyState, setError, state.uploadedDataset, state.validationSettings]);
+  }, [snapshot.uploadedDataset]);
 
   const runFullPipeline = useCallback(async () => {
-    const { matrixFile, vectorFile } = state;
-
     if (!matrixFile || !vectorFile) {
-      setError("Select both X matrix and y vector files before running the full pipeline.");
+      setSnapshot((current) => ({
+        ...current,
+        error: "Select both X matrix and y vector files before running the full pipeline.",
+      }));
       return;
     }
 
-    setError(null);
-    setBusyState("loading-data");
-
     try {
-      const loaded = await loadDataset(matrixFile, vectorFile);
-      dispatch({ type: "set-uploaded-dataset", dataset: loaded });
-      dispatch({ type: "set-selection-result", result: null });
-      dispatch({ type: "set-validation-result", result: null });
-      appendHistory(`Loaded dataset (${loaded.rows} rows, ${loaded.descriptors} descriptors).`);
+      const loaded = await invokeLoadDataset(matrixFile, vectorFile);
+      setSnapshot(loaded);
 
-      setBusyState("filtering");
-      const pipeline = await runPipeline(
-        loaded.sessionId,
-        state.filterSettings,
-        state.selectionSettings,
-        state.validationSettings,
-      );
-      dispatch({ type: "set-active-dataset", dataset: pipeline.dataset });
-      dispatch({ type: "set-selection-result", result: pipeline.selection });
-      dispatch({ type: "set-validation-result", result: pipeline.validation });
-      appendHistory(
-        `Applied descriptor filters. Active matrix now has ${pipeline.dataset.descriptors} descriptors.`,
-      );
-      appendHistory(
-        `${pipeline.selection.method.toUpperCase()} selected ${pipeline.selection.selectedDescriptors} descriptors (Q2 ${pipeline.selection.q2.toFixed(
-          3,
-        )}).`,
-      );
-      appendHistory("Validation suite completed.");
-      appendHistory("Full pipeline finished with backend results.");
+      const pipeline = await invokeRunPipeline();
+      setSnapshot(pipeline);
     } catch (pipelineError) {
-      setError(toErrorMessage(pipelineError, "Failed to run the full pipeline."));
-    } finally {
-      setBusyState("idle");
+      setSnapshot((current) => ({
+        ...current,
+        error: toErrorMessage(pipelineError, "Failed to run the full pipeline."),
+      }));
     }
-  }, [appendHistory, setBusyState, setError, state]);
+  }, [matrixFile, vectorFile]);
 
-  const isIdle = state.busyState === "idle";
-  const canLoadData = Boolean(state.matrixFile && state.vectorFile) && isIdle;
-  const canRunFilters = Boolean(state.activeDataset) && isIdle;
-  const canRunSelection = Boolean(state.activeDataset) && isIdle;
-  const canRunValidation = Boolean(state.selectionResult) && isIdle;
-  const canRunPipeline = Boolean(state.matrixFile && state.vectorFile) && isIdle;
+  const isIdle = snapshot.busyState === "idle";
+  const canLoadData = Boolean(matrixFile && vectorFile) && isIdle;
+  const canRunFilters = Boolean(snapshot.activeDataset) && isIdle;
+  const canRunSelection = Boolean(snapshot.activeDataset) && isIdle;
+  const canRunValidation = Boolean(snapshot.selectionResult) && isIdle;
+  const canRunPipeline = Boolean(matrixFile && vectorFile) && isIdle;
+
+  const state = useMemo<WorkflowState>(
+    () => ({
+      matrixFile,
+      vectorFile,
+      uploadedDataset: snapshot.uploadedDataset,
+      activeDataset: snapshot.activeDataset,
+      selectionResult: snapshot.selectionResult,
+      validationResult: snapshot.validationResult,
+      busyState: snapshot.busyState,
+      error: snapshot.error,
+      history: snapshot.history,
+      filterSettings: snapshot.filterSettings,
+      selectionSettings: snapshot.selectionSettings,
+      validationSettings: snapshot.validationSettings,
+    }),
+    [matrixFile, snapshot, vectorFile],
+  );
 
   return {
     state,
     actions: {
-      setMatrixFile,
-      setVectorFile,
+      setMatrixFile: setMatrixFileAction,
+      setVectorFile: setVectorFileAction,
       updateFilterSettings,
       updateSelectionSettings,
       updateValidationSettings,

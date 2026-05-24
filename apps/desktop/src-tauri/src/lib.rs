@@ -4,6 +4,8 @@ use tauri::Manager;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
+mod workflow;
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AppInfo {
@@ -33,6 +35,7 @@ pub fn run() {
         .manage(SidecarState {
             child_pid: Mutex::new(None),
         })
+        .manage(workflow::WorkflowSessionStore::default())
         .setup(|app| {
             let sidecar_command = app
                 .shell()
@@ -67,7 +70,18 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_info])
+        .invoke_handler(tauri::generate_handler![
+            app_info,
+            workflow::get_workflow_snapshot,
+            workflow::update_filter_settings,
+            workflow::update_selection_settings,
+            workflow::update_validation_settings,
+            workflow::load_dataset,
+            workflow::run_descriptor_filters,
+            workflow::run_variable_selection,
+            workflow::run_validation_suite,
+            workflow::run_full_pipeline,
+        ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app_handle, event| {
