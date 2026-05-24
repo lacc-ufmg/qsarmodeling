@@ -1,6 +1,6 @@
 [package]
 name = "qsarmodeling"
-version = "0.2.0"
+version.workspace = true
 description = "A Tauri App"
 authors = ["Heliton Martins <helitonmrf@gmail.com>"]
 edition = "2021"

@@ -19,13 +19,22 @@ import { SelectionPanel } from "./components/workflow/SelectionPanel";
 import { ValidationPanel } from "./components/workflow/ValidationPanel";
 import { WorkflowTimeline } from "./components/workflow/WorkflowTimeline";
 import icon from "./assets/icon.png";
-// import { app, core } from "@tauri-apps/api"
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
-export default function App() {
+export default function App () {
   const { toggleColorScheme } = useMantineColorScheme();
   const { state, actions, selectors } = useQsarWorkflow();
-  // const version = app.getVersion();
-  // const bundleType = app.getBundleType();
+  const [version, setVersion] = useState("0.x.x");
+
+  useEffect(() => {
+    invoke("app_info")
+      .then(({version}: any) => setVersion(version))
+      .catch((err) => {
+        console.error("Failed to get app version:", err);
+      });
+  }, []);
+
   return (
     <AppShell header={{ height: 78 }} padding="lg">
       <AppShell.Header>
@@ -36,8 +45,7 @@ export default function App() {
               <Box>
                 <Text fw={700}>QSAR Modeling</Text>
                 <Text size="xs" tt="uppercase" fw={600} c="dimmed">
-                  v0.2.0
-                  {/* {version} ({bundleType}) */}
+                  v{version}
                 </Text>
               </Box>
             </Group>
