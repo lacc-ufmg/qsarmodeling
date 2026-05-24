@@ -16,7 +16,7 @@ Run locally (using `uv`):
 uv sync
 
 # run the server (development)
-uv run uvicorn app:app --reload --host 127.0.0.1 --port 8000
+uv run uvicorn app:app --reload --host 127.0.0.1 --port 27051
 ```
 
-The frontend expects the backend at `http://127.0.0.1:8000`.
+The frontend expects the backend at `http://127.0.0.1:27051`.

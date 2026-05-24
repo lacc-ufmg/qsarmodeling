@@ -1,19 +1,23 @@
 {
   "name": "desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "sync-sidecar": "node scripts/sync-backend-sidecar.mjs",
+    "dev": "vite",
+    "vitebuild": "vite build",
     "build": "tauri build",
     "tauri": "tauri"
   },
   "dependencies": {
-    "backend": "workspace:*",
-    "frontend": "workspace:*",
+    "@mantine/core": "^7.17.8",
+    "@mantine/hooks": "^7.17.8",
+    "@tabler/icons-react": "^3.44.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-shell": "~2.3.5",
+    "backend": "workspace:*",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

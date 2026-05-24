@@ -15,7 +15,6 @@
     "uvsync": {
       "inputs": ["pyproject.toml", "uv.lock"],
       "cache": false,
-      "outputs": [".venv/*"],
     }
   }
 }
