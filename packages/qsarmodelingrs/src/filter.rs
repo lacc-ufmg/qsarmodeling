@@ -25,10 +25,24 @@ fn series_to_vec(series: &Column) -> Result<Vec<f64>> {
 
 fn dataframe_to_matrix(frame: &DataFrame) -> Result<Vec<Vec<f64>>> {
     frame
-        .get_columns()
+    .columns()
         .iter()
         .map(series_to_vec)
         .collect()
+}
+
+fn select_columns_by_indices(frame: &DataFrame, indices: &[usize]) -> Result<DataFrame> {
+    let column_names = frame.get_column_names();
+    let selected_names = indices
+        .iter()
+        .map(|index| {
+            column_names.get(*index).map(|name| name.as_str()).ok_or_else(|| {
+                QsarError::InvalidDataset(format!("Column index {} is out of bounds.", index))
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(frame.select(selected_names)?)
 }
 
 fn mean(values: &[f64]) -> f64 {
@@ -95,7 +109,7 @@ fn lj_cut(value: f64, cut: f64) -> f64 {
 
 fn apply_lj_transform(frame: &DataFrame) -> Result<DataFrame> {
     let columns: Result<Vec<Column>> = frame
-        .get_columns()
+        .columns()
         .iter()
         .map(|column| {
             let values = series_to_vec(column)?;
@@ -104,7 +118,7 @@ fn apply_lj_transform(frame: &DataFrame) -> Result<DataFrame> {
         })
         .collect();
 
-    Ok(DataFrame::new(columns?)?)
+    Ok(DataFrame::new(frame.height(), columns?)?)
 }
 
 pub fn variance_cut(frame: &DataFrame, cut: f64) -> Result<Vec<usize>> {
@@ -164,20 +178,14 @@ pub fn filter_matrix(frame: &DataFrame, y: &[f64], settings: FilterSettings) -> 
     };
 
     let variance_indices = variance_cut(&filtered, settings.var_cut)?;
-    filtered = filtered.select_at_idx_iter(variance_indices.iter().copied()).ok_or_else(|| {
-        QsarError::InvalidDataset("Failed to select variance-filtered columns.".to_string())
-    })?;
+    filtered = select_columns_by_indices(&filtered, &variance_indices)?;
 
     let corr_indices = correlation_cut(&filtered, y, settings.corr_cut)?;
-    filtered = filtered.select_at_idx_iter(corr_indices.iter().copied()).ok_or_else(|| {
-        QsarError::InvalidDataset("Failed to select correlation-filtered columns.".to_string())
-    })?;
+    filtered = select_columns_by_indices(&filtered, &corr_indices)?;
 
     let autocorr_indices = autocorrelation_cut(&filtered, y, settings.autocorr_cut)?;
     let selected_indices = autocorr_indices;
-    filtered = filtered.select_at_idx_iter(selected_indices.iter().copied()).ok_or_else(|| {
-        QsarError::InvalidDataset("Failed to select autocorrelation-filtered columns.".to_string())
-    })?;
+    filtered = select_columns_by_indices(&filtered, &selected_indices)?;
 
     if filtered.width() == 0 {
         return Err(QsarError::EmptyFilterResult);

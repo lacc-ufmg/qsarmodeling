@@ -1,16 +1,25 @@
 {
-  "servers": {
-    "tailwindcss-server": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "tailwindcss-mcp-server"
-      ],
-      "type": "stdio"
-    },
-    "mantine": {
-      "command": "npx",
-      "args": ["-y", "@mantine/mcp-server"]
-    }
-  }
+	"servers": {
+		"tailwindcss-server": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"tailwindcss-mcp-server"
+			],
+			"type": "stdio"
+		},
+		"mantine": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@mantine/mcp-server"
+			],
+			"type": "stdio"
+		},
+		"polars-mcp": {
+			"url": "https://mcp.pola.rs/mcp",
+			"type": "http"
+		}
+	},
+	"inputs": []
 }

@@ -1,8 +1,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use csv::ReaderBuilder;
 use polars::prelude::*;
 
 use crate::error::{QsarError, Result};
@@ -108,100 +107,91 @@ pub fn detect_csv_layout(path: impl AsRef<Path>) -> Result<CsvLayout> {
     })
 }
 
-fn build_reader(path: &Path, layout: CsvLayout) -> Result<csv::Reader<File>> {
-    Ok(ReaderBuilder::new()
-        .has_headers(layout.has_header)
-        .delimiter(layout.delimiter)
-        .from_path(path)?)
+fn read_csv_frame(path: &Path, layout: CsvLayout) -> Result<DataFrame> {
+    let file = File::open(path)?;
+    Ok(CsvReadOptions::default()
+        .with_has_header(layout.has_header)
+        .map_parse_options(|parse_options| parse_options.with_separator(layout.delimiter))
+        .into_reader_with_file_handle(file)
+        .finish()?)
 }
 
-fn generate_column_name(index: usize) -> String {
-    format!("column_{index}")
+fn series_to_f64_values(series: &Column, row_offset: usize) -> Result<Vec<f64>> {
+    let materialized = series.as_materialized_series();
+    let casted = materialized.cast(&DataType::Float64)?;
+    let chunked = casted.f64()?;
+    let mut values = Vec::with_capacity(chunked.len());
+
+    for row_index in 0..chunked.len() {
+        match chunked.get(row_index) {
+            Some(value) => values.push(value),
+            None => {
+                let raw_value = materialized.get(row_index)?.to_string();
+                return Err(QsarError::NonNumericValue {
+                    column: materialized.name().to_string(),
+                    row: row_offset + row_index + 1,
+                    value: raw_value,
+                });
+            }
+        }
+    }
+
+    Ok(values)
 }
 
 pub fn load_matrix(path: impl AsRef<Path>) -> Result<LoadedMatrix> {
     let path = path.as_ref();
     let layout = detect_csv_layout(path)?;
-    let mut reader = build_reader(path, layout)?;
+    let frame = read_csv_frame(path, layout)?;
 
-    let headers: Vec<String> = if layout.has_header {
-        reader
-            .headers()?
-            .iter()
-            .map(normalize_cell)
-            .collect()
-    } else {
-        Vec::new()
-    };
-
-    let mut row_labels = layout.has_index.then(Vec::new);
-    let mut columns: Vec<Vec<f64>> = Vec::new();
-    let mut column_names: Vec<String> = Vec::new();
-    let mut expected_width: Option<usize> = None;
-
-    for (row_index, record) in reader.records().enumerate() {
-        let record = record?;
-        let values: Vec<String> = record.iter().map(normalize_cell).collect();
-        let width = values.len();
-
-        if expected_width.is_none() {
-            expected_width = Some(width);
-            let data_width = width.saturating_sub(usize::from(layout.has_index));
-            columns = vec![Vec::new(); data_width];
-            column_names = if layout.has_header {
-                headers
-                    .iter()
-                    .skip(usize::from(layout.has_index))
-                    .map(|name| name.to_string())
-                    .collect()
-            } else {
-                (0..data_width)
-                    .map(|index| generate_column_name(index + 1))
-                    .collect()
-            };
-        }
-
-        if Some(width) != expected_width {
-            return Err(QsarError::InvalidDataset(format!(
-                "Inconsistent row width in {} at row {}.",
-                path.display(),
-                row_index + 1,
-            )));
-        }
-
-        if layout.has_index {
-            if let Some(labels) = row_labels.as_mut() {
-                labels.push(values[0].to_string());
-            }
-        }
-
-        for (column_index, value) in values.iter().skip(usize::from(layout.has_index)).enumerate() {
-            let parsed = value.parse::<f64>().map_err(|_| QsarError::NonNumericValue {
-                column: column_names
-                    .get(column_index)
-                    .cloned()
-                    .unwrap_or_else(|| generate_column_name(column_index + 1)),
-                row: row_index + 1,
-                value: value.to_string(),
-            })?;
-            columns[column_index].push(parsed);
-        }
-    }
-
-    if columns.is_empty() {
+    if frame.height() == 0 || frame.width() == 0 {
         return Err(QsarError::InvalidDataset(format!(
             "No data columns found in {}.",
             path.display()
         )));
     }
 
-    let series: Vec<Column> = column_names
-        .into_iter()
-        .zip(columns)
-        .map(|(name, values)| Series::new(name.into(), values).into_column())
+    let (row_labels, data_frame) = if layout.has_index {
+        let index_name = frame.get_column_names().first().copied().ok_or_else(|| {
+            QsarError::InvalidDataset(format!("No data columns found in {}.", path.display()))
+        })?;
+        let labels = frame
+            .column(index_name)?
+            .as_materialized_series()
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>();
+
+        if frame.width() <= 1 {
+            return Err(QsarError::InvalidDataset(format!(
+                "No data columns found in {}.",
+                path.display()
+            )));
+        }
+
+        let data_names: Vec<&str> = frame
+            .get_column_names()
+            .iter()
+            .skip(1)
+            .map(|name| name.as_str())
+            .collect();
+        let data_frame = frame.select(data_names)?;
+        (Some(labels), data_frame)
+    } else {
+        (None, frame)
+    };
+
+    let columns: Result<Vec<Column>> = data_frame
+        .columns()
+        .iter()
+        .map(|column| {
+            series_to_f64_values(column, 0).map(|values| {
+                Series::new(column.name().clone(), values).into_column()
+            })
+        })
         .collect();
 
-    let frame = DataFrame::new(series)?;
+    let frame = DataFrame::new(data_frame.height(), columns?)?;
 
     Ok(LoadedMatrix {
         frame,
@@ -212,39 +202,30 @@ pub fn load_matrix(path: impl AsRef<Path>) -> Result<LoadedMatrix> {
 
 pub fn load_vector(path: impl AsRef<Path>) -> Result<Vec<f64>> {
     let path = path.as_ref();
-    let mut reader = ReaderBuilder::new()
-        .has_headers(false)
-        .delimiter(detect_csv_layout(path)?.delimiter)
-        .from_path(path)?;
+    let layout = detect_csv_layout(path)?;
+    let file = File::open(path)?;
+    let frame = CsvReadOptions::default()
+        .with_has_header(false)
+        .map_parse_options(|parse_options| parse_options.with_separator(layout.delimiter))
+        .into_reader_with_file_handle(file)
+        .finish()?;
 
-    let mut values = Vec::new();
-
-    for (row_index, record) in reader.records().enumerate() {
-        let record = record?;
-        if record.len() != 1 {
-            return Err(QsarError::InvalidDataset(format!(
-                "Target vector {} must contain exactly one column, found {} at row {}.",
-                path.display(),
-                record.len(),
-                row_index + 1,
-            )));
-        }
-
-        let value = record.get(0).unwrap_or_default().trim();
-        let parsed = value.parse::<f64>().map_err(|_| QsarError::NonNumericValue {
-            column: "y".to_string(),
-            row: row_index + 1,
-            value: value.to_string(),
-        })?;
-        values.push(parsed);
-    }
-
-    if values.is_empty() {
+    if frame.height() == 0 {
         return Err(QsarError::InvalidDataset(format!(
             "Target vector {} is empty.",
             path.display()
         )));
     }
+
+    if frame.width() != 1 {
+        return Err(QsarError::InvalidDataset(format!(
+            "Target vector {} must contain exactly one column, found {}.",
+            path.display(),
+            frame.width(),
+        )));
+    }
+
+    let values = series_to_f64_values(&frame.columns()[0], 0)?;
 
     Ok(values)
 }
