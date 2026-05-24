@@ -1,5 +1,5 @@
 use chrono::Local;
-use qsarmodelingrs::{load_dataset as qsar_load_dataset, filter_matrix, LoadedMatrix};
+use qsarmodelingrs::{load_dataset as qsar_load_dataset, filter_matrix, LoadedMatrix, run_ops, SelectionSettings as QsarSelectionSettings};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
@@ -621,22 +621,68 @@ pub async fn run_variable_selection(
         )
     };
 
-    #[derive(Serialize)]
-    struct SelectionRequest {
-        #[serde(rename = "filterSettings")]
-        filter_settings: FilterSettings,
-        #[serde(rename = "selectionSettings")]
-        selection_settings: SelectionSettings,
-    }
+    let selected = if let SelectionMethod::Ops = selection_settings.method {
+        // Run local OPS selection using loaded matrix and target
+        let (matrix, y) = {
+            let session = state.session.lock().map_err(|e| e.to_string())?;
+            let matrix = session
+                .loaded_matrix
+                .as_ref()
+                .ok_or_else(|| "No loaded matrix available for selection.".to_string())?
+                .clone();
+            let y = session
+                .loaded_target
+                .as_ref()
+                .ok_or_else(|| "No loaded target vector available for selection.".to_string())?
+                .clone();
+            (matrix, y)
+        };
 
-    let selected = post_json::<_, SelectionResult>(
-        &format!("/sessions/{session_id}/selection"),
-        &SelectionRequest {
-            filter_settings,
-            selection_settings,
-        },
-    )
-    .await;
+        let qsar_settings = QsarSelectionSettings {
+            latent_vars_model: selection_settings.latent_vars_model as usize,
+            latent_vars_ops: selection_settings.latent_vars_ops as usize,
+            vars_percentage: selection_settings.vars_percentage as usize,
+            min_vars_model: selection_settings.min_vars_model as usize,
+            max_vars_model: selection_settings.max_vars_model as usize,
+            population_size: selection_settings.population_size as usize,
+            generations: selection_settings.generations as usize,
+        };
+
+        match run_ops(&matrix.frame, &y, qsar_settings) {
+            Ok(mut res) => {
+                res.session_id = session_id.clone();
+                // map to workflow SelectionResult
+                let mapped = SelectionResult {
+                    session_id: res.session_id.clone(),
+                    method: if res.method.to_lowercase() == "ops" { SelectionMethod::Ops } else { SelectionMethod::Ga },
+                    selected_descriptors: res.selected_descriptors as u32,
+                    latent_variables: res.latent_variables as u32,
+                    q2: res.q2,
+                    r2: res.r2,
+                    validation_passed: res.validation_passed,
+                };
+                Ok(mapped)
+            }
+            Err(err) => Err(err.to_string()),
+        }
+    } else {
+        #[derive(Serialize)]
+        struct SelectionRequest {
+            #[serde(rename = "filterSettings")]
+            filter_settings: FilterSettings,
+            #[serde(rename = "selectionSettings")]
+            selection_settings: SelectionSettings,
+        }
+
+        post_json::<_, SelectionResult>(
+            &format!("/sessions/{session_id}/selection"),
+            &SelectionRequest {
+                filter_settings,
+                selection_settings,
+            },
+        )
+        .await
+    };
 
     let selected = match selected {
         Ok(result) => result,

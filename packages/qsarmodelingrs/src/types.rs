@@ -29,6 +29,29 @@ pub struct FilterSettings {
     pub lj_transform: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectionSettings {
+    pub latent_vars_model: usize,
+    pub latent_vars_ops: usize,
+    pub vars_percentage: usize,
+    pub min_vars_model: usize,
+    pub max_vars_model: usize,
+    pub population_size: usize,
+    pub generations: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectionResult {
+    pub session_id: String,
+    pub method: String,
+    pub selected_descriptors: usize,
+    pub latent_variables: usize,
+    pub q2: f64,
+    pub r2: f64,
+    pub validation_passed: bool,
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct FilterCacheKey {
     var_cut: u64,
