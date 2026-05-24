@@ -1,5 +1,5 @@
 use chrono::Local;
-use qsarmodelingrs::load_dataset as qsar_load_dataset;
+use qsarmodelingrs::{load_dataset as qsar_load_dataset, filter_matrix, LoadedMatrix};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
@@ -180,6 +180,8 @@ pub struct WorkflowSnapshot {
 struct WorkflowSession {
     uploaded_dataset: Option<DatasetProfile>,
     active_dataset: Option<DatasetProfile>,
+    loaded_matrix: Option<LoadedMatrix>,
+    loaded_target: Option<Vec<f64>>,
     selection_result: Option<SelectionResult>,
     validation_result: Option<ValidationResult>,
     busy_state: BusyState,
@@ -226,6 +228,8 @@ impl Default for WorkflowSession {
                 lno_cutoff: 0.1,
                 test_set_ratio: 0.2,
             },
+            loaded_matrix: None,
+            loaded_target: None,
         }
     }
 }
@@ -451,7 +455,7 @@ pub async fn load_dataset(
     }
 
     // Load dataset directly from file paths using qsarmodelingrs
-    let loaded_dataset = (|| -> Result<DatasetProfile, String> {
+    let (loaded_dataset, loaded_matrix, loaded_target) = (|| -> Result<(DatasetProfile, LoadedMatrix, Vec<f64>), String> {
         let matrix_path = std::path::PathBuf::from(&input.matrix_path);
         let vector_path = std::path::PathBuf::from(&input.vector_path);
 
@@ -464,8 +468,7 @@ pub async fn load_dataset(
         }
 
         // Load using qsarmodelingrs
-        let (matrix, _y) =
-            qsar_load_dataset(&matrix_path, &vector_path).map_err(|e| e.to_string())?;
+        let (matrix, y) = qsar_load_dataset(&matrix_path, &vector_path).map_err(|e| e.to_string())?;
 
         let session_id = Uuid::new_v4().to_string();
         let matrix_name = matrix_path
@@ -479,21 +482,25 @@ pub async fn load_dataset(
             .unwrap_or("vector.csv")
             .to_string();
 
-        Ok(DatasetProfile {
+        let profile = DatasetProfile {
             session_id: session_id.clone(),
             id: session_id.clone(),
-            matrix_name,
-            vector_name,
+            matrix_name: matrix_name.clone(),
+            vector_name: vector_name.clone(),
             rows: matrix.frame.height() as u32,
             descriptors: matrix.frame.width() as u32,
-            source: "Local".to_string(),
-        })
+            source: "uploaded".to_string(),
+        };
+
+        Ok((profile, matrix, y))
     })()?;
 
     let snapshot = {
         let mut session = state.session.lock().map_err(|error| error.to_string())?;
         session.uploaded_dataset = Some(loaded_dataset.clone());
         session.active_dataset = Some(loaded_dataset.clone());
+        session.loaded_matrix = Some(loaded_matrix.clone());
+        session.loaded_target = Some(loaded_target.clone());
         session.clear_results();
         session.busy_state = BusyState::Idle;
         session.error = None;
@@ -513,48 +520,43 @@ pub async fn run_descriptor_filters(
     app: AppHandle,
     state: State<'_, WorkflowSessionStore>,
 ) -> Result<WorkflowSnapshot, String> {
-    let (session_id, settings) = {
+    let (session_id, matrix_name, vector_name, settings, matrix, y) = {
         let mut session = state.session.lock().map_err(|error| error.to_string())?;
-        let session_id = session
+        let uploaded = session
             .uploaded_dataset
             .as_ref()
-            .ok_or_else(|| "Load a dataset before applying filters.".to_string())?
-            .session_id
-            .clone();
+            .ok_or_else(|| "Load a dataset before applying filters.".to_string())?;
+        let session_id = uploaded.session_id.clone();
+        let matrix_name = uploaded.matrix_name.clone();
+        let vector_name = uploaded.vector_name.clone();
+        let settings = session.filter_settings.clone();
+        let matrix = session
+            .loaded_matrix
+            .clone()
+            .ok_or_else(|| "No loaded matrix available for filtering.".to_string())?;
+        let y = session
+            .loaded_target
+            .clone()
+            .ok_or_else(|| "No loaded target vector available for filtering.".to_string())?;
+
         set_busy_state(&mut session, BusyState::Filtering);
         let snapshot = session.snapshot();
         emit_snapshot(&app, &snapshot)?;
-        (session_id, session.filter_settings.clone())
+        (session_id, matrix_name, vector_name, settings, matrix, y)
     };
 
-    #[derive(Serialize)]
-    struct FilterRequest {
-        #[serde(rename = "varCut")]
-        var_cut: f64,
-        #[serde(rename = "corrCut")]
-        corr_cut: f64,
-        #[serde(rename = "autocorrCut")]
-        autocorr_cut: f64,
-        autoscale: bool,
-        #[serde(rename = "ljTransform")]
-        lj_transform: bool,
-    }
+    let qsar_settings = qsarmodelingrs::FilterSettings {
+        var_cut: settings.var_cut,
+        corr_cut: settings.corr_cut,
+        autocorr_cut: settings.autocorr_cut,
+        autoscale: settings.autoscale,
+        lj_transform: settings.lj_transform,
+    };
 
-    let filtered = post_json::<_, DatasetProfile>(
-        &format!("/sessions/{session_id}/filters"),
-        &FilterRequest {
-            var_cut: settings.var_cut,
-            corr_cut: settings.corr_cut,
-            autocorr_cut: settings.autocorr_cut,
-            autoscale: settings.autoscale,
-            lj_transform: settings.lj_transform,
-        },
-    )
-    .await;
-
-    let filtered = match filtered {
-        Ok(dataset) => dataset,
-        Err(error) => {
+    let filtered = match filter_matrix(&matrix.frame, &y, qsar_settings) {
+        Ok(filtered) => filtered,
+        Err(err) => {
+            let error = err.to_string();
             let snapshot = {
                 let mut session = state
                     .session
@@ -569,15 +571,25 @@ pub async fn run_descriptor_filters(
         }
     };
 
+    let new_profile = DatasetProfile {
+        session_id: session_id.clone(),
+        id: format!("dataset-{}-filtered", session_id),
+        matrix_name,
+        vector_name,
+        rows: matrix.frame.height() as u32,
+        descriptors: filtered.frame.width() as u32,
+        source: "filtered".to_string(),
+    };
+
     let snapshot = {
         let mut session = state.session.lock().map_err(|error| error.to_string())?;
-        session.active_dataset = Some(filtered.clone());
+        session.active_dataset = Some(new_profile.clone());
         session.clear_results();
         session.busy_state = BusyState::Idle;
         session.error = None;
         session.append_history(format!(
             "Applied descriptor filters. Active matrix now has {} descriptors.",
-            filtered.descriptors
+            filtered.frame.width()
         ));
         session.snapshot()
     };
