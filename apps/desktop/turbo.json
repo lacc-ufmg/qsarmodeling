@@ -3,9 +3,9 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "dependsOn": ["prebuild"],
-      "inputs": ["$TURBO_DEFAULT$", "src-tauri/**"],
-      "outputs": ["src-tauri/target/release/**", "$TURBO_ROOT$/target/release/**"],
+      // "dependsOn": ["prebuild"],
+      "inputs": ["$TURBO_DEFAULT$", "src-tauri/**", "src/**", "public/**", "vite.config.ts", "tauri.conf.json"],
+      "outputs": ["$TURBO_ROOT$/target/release/bundle/**"],
       "cache": true
     },
     "sync-sidecar": {
@@ -15,7 +15,8 @@
       "cache": true
     },
     "prebuild": {
-      "dependsOn": ["vitebuild", "sync-sidecar"],
+      // "dependsOn": ["vitebuild", "sync-sidecar"],
+      "dependsOn": ["vitebuild"],
       "cache": true
     },
     "vitebuild": {
@@ -26,7 +27,7 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "with": ["backend#dev"]
+      // "with": ["backend#dev"]
     }
   }
 }

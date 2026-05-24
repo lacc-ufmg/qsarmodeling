@@ -4,9 +4,9 @@
   "version": "0.3.0",
   "identifier": "com.hellmrf.qsarmodeling",
   "build": {
-    "beforeDevCommand": "pnpm sync-sidecar && pnpm dev",
+    "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm sync-sidecar && pnpm run vitebuild",
+    "beforeBuildCommand": "pnpm run vitebuild",
     "frontendDist": "../dist"
   },
   "app": {
@@ -46,9 +46,6 @@
     "copyright": "Copyright © 2026 Heliton Martins. All rights reserved.",
     "publisher": "LACC-UFMG",
     "homepage": "https://github.com/hellmrf/qsarmodeling",
-    "externalBin": [
-      "binaries/qsar-backend"
-    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
