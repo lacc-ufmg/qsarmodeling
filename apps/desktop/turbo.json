@@ -15,7 +15,12 @@
       "cache": true
     },
     "prebuild": {
-      "dependsOn": ["frontend#build", "sync-sidecar"],
+      "dependsOn": ["vitebuild", "sync-sidecar"],
+      "cache": true
+    },
+    "vitebuild": {
+      "inputs": ["$TURBO_DEFAULT$", "vite.config.ts", "src/**/*", "public/**/*", "index.html"],
+      "outputs": ["dist/**"],
       "cache": true
     },
     "dev": {
