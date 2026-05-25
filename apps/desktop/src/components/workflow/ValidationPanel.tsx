@@ -1,4 +1,4 @@
-import { Box, Button, Checkbox, Group, Paper, Stack, Text } from "@mantine/core";
+import { Button, Checkbox, Group, Paper, Stack, Text } from "@mantine/core";
 import { IconListCheck, IconPlayerPlay } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
@@ -24,7 +24,7 @@ export function ValidationPanel({
   selectionResult,
   validationResult,
   validationSettings,
-  isLoading,
+  isLoading: _isLoading,
   isValidating,
   isPipelineRunning,
   isDisabled,
@@ -40,6 +40,7 @@ export function ValidationPanel({
       description="Run validation tests to confirm model quality and stability"
       isComplete={Boolean(validationResult)}
       disabled={isDisabled}
+      futurePreview
     >
       {selectionResult ? (
         <Stack>

@@ -3,7 +3,6 @@ import { IconListCheck } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import { ExpandableSection } from "../ui/ExpandableSection";
-import { NumberFieldWithTooltip } from "../ui/NumberFieldWithTooltip";
 import type { DatasetProfile, SelectionResult, SelectionSettings } from "../../lib/mockQsarBackend";
 import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
 
@@ -28,8 +27,6 @@ export function SelectionPanel({
 }: SelectionPanelProps) {
   const isOps = selectionSettings.method === "ops";
 
-
-
   return (
     <StepCard
       step={3}
@@ -37,6 +34,7 @@ export function SelectionPanel({
       description="Choose the best subset of descriptors for your model"
       isComplete={Boolean(selectionResult)}
       disabled={isDisabled}
+      futurePreview
     >
       {activeDataset ? (
         <Stack>
