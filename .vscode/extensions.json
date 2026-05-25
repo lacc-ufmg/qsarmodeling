@@ -3,6 +3,7 @@
         "yzhang.markdown-all-in-one",
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "tauri-apps.tauri-vscode"
+        "tauri-apps.tauri-vscode",
+        "vadimcn.vscode-lldb"
     ]
 }
