@@ -1,6 +1,4 @@
 use polars::prelude::PolarsError;
-use serde;
-use serde_json;
 use serde::Serialize;
 use thiserror::Error;
 
@@ -37,7 +35,6 @@ pub enum AppError {
     #[error("Dimensões inconsistentes: X tem {x_samples} amostras, y tem {y_samples}")]
     DimensionMismatch { x_samples: usize, y_samples: usize },
 
-    /// Operação exige um estágio mínimo que ainda não foi atingido.
     #[error("Pipeline insuficiente: requer estágio '{required}'")]
     InsufficientPipeline { required: String },
 
@@ -48,11 +45,11 @@ pub enum AppError {
     Computation { message: String },
 }
 
-// Necessário para retornar AppError em comandos Tauri.
-impl From<AppError> for tauri::ipc::InvokeError {
-    fn from(e: AppError) -> Self {
-        serde_json::to_value(&e)
-            .map(Self::from)
-            .unwrap_or_else(|_| Self::from(e.to_string()))
-    }
-}
+// Allow returning `AppError` from Tauri commands.
+// impl From<AppError> for tauri::ipc::InvokeError {
+//     fn from(e: AppError) -> Self {
+//         serde_json::to_value(&e)
+//             .map(Self::from)
+//             .unwrap_or_else(|_| Self::from(e.to_string()))
+//     }
+// }

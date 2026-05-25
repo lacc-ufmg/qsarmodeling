@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps/desktop/src-tauri", "packages/qsarmodelingrs"]
+members = ["apps/desktop/src-tauri"]
 
 [workspace.package]
 version = "0.3.0"

@@ -3881,7 +3881,9 @@ name = "qsarmodeling"
 version = "0.3.0"
 dependencies = [
  "chrono",
- "qsarmodelingrs",
+ "csv",
+ "ndarray",
+ "polars",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -3890,19 +3892,10 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-shell",
- "uuid",
-]
-
-[[package]]
-name = "qsarmodelingrs"
-version = "0.3.0"
-dependencies = [
- "csv",
- "ndarray",
- "polars",
- "serde",
  "tempfile",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-util",
  "uuid",
 ]
 

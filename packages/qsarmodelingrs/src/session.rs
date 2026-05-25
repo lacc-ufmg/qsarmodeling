@@ -4,7 +4,7 @@ use std::path::Path;
 use polars::prelude::*;
 
 use crate::error::{QsarError, Result};
-use crate::filter::{filter_matrix_from_original, FilteredMatrix};
+use crate::filter::filter_matrix_from_original;
 use crate::loader::{load_dataset, LoadedMatrix};
 use crate::types::{DatasetProfile, DatasetSource, FilterCacheKey, FilterSettings};
 
