@@ -73,6 +73,8 @@ jobs:
             or install with something like [AppImageLauncher](https://appimagelauncher.com/).
 
             See the assets to download this version and install.
+
+            You can use the [example datasets](https://github.com/hellmrf/qsarmodeling/tree/refs/tags/v0.3.0/packages/qsarmodelingrs/tests/data) to test the application.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
