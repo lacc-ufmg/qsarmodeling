@@ -1,5 +1,5 @@
 use chrono::Local;
-use crate::core::{load_dataset as qsar_load_dataset, filter_matrix, LoadedMatrix, run_ops, SelectionSettings as QsarSelectionSettings};
+use crate::core::{load_dataset as qsar_load_dataset, filter_matrix, RawDataset, run_ops, SelectionSettings as QsarSelectionSettings};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
@@ -180,7 +180,7 @@ pub struct WorkflowSnapshot {
 struct WorkflowSession {
     uploaded_dataset: Option<DatasetProfile>,
     active_dataset: Option<DatasetProfile>,
-    loaded_matrix: Option<LoadedMatrix>,
+    loaded_matrix: Option<RawDataset>,
     loaded_target: Option<Vec<f64>>,
     selection_result: Option<SelectionResult>,
     validation_result: Option<ValidationResult>,
@@ -455,7 +455,7 @@ pub async fn load_dataset(
     }
 
     // Load dataset directly from file paths using qsarmodelingrs
-    let (loaded_dataset, loaded_matrix, loaded_target) = (|| -> Result<(DatasetProfile, LoadedMatrix, Vec<f64>), String> {
+    let (loaded_dataset, loaded_matrix, loaded_target) = (|| -> Result<(DatasetProfile, RawDataset, Vec<f64>), String> {
         let matrix_path = std::path::PathBuf::from(&input.matrix_path);
         let vector_path = std::path::PathBuf::from(&input.vector_path);
 
@@ -468,7 +468,8 @@ pub async fn load_dataset(
         }
 
         // Load using qsarmodelingrs
-        let (matrix, y) = qsar_load_dataset(&matrix_path, &vector_path).map_err(|e| e.to_string())?;
+        let matrix = qsar_load_dataset(&matrix_path, &vector_path).map_err(|e| e.to_string())?;
+        let y = matrix.y.to_vec();
 
         let session_id = Uuid::new_v4().to_string();
         let matrix_name = matrix_path

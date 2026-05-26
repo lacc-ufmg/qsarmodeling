@@ -1,5 +1,5 @@
 _default:
-    @{{ quote(just_executable()) }} --list --justfile={{ quote(justfile()) }}
+    @{{ quote(just_executable()) }} --list --justfile={{ quote(justfile()) }} --unsorted
 
 
 dev:
@@ -7,6 +7,10 @@ dev:
 alias tauridev := dev
 alias td := dev
 
+
+test:
+    cargo test
+alias t := test
 
 build:
     pnpm run build

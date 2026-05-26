@@ -5,7 +5,7 @@ use polars::prelude::*;
 
 use super::error::{QsarError, Result};
 use super::filter::{filter_matrix_from_original};
-use super::loader::{load_dataset, LoadedMatrix};
+use super::loader::{load_dataset, RawDataset};
 use super::types::{DatasetProfile, DatasetSource, FilterCacheKey, FilterSettings};
 
 #[derive(Debug, Clone)]
@@ -27,7 +27,7 @@ pub struct FilteredDataset {
 }
 
 impl LoadedDataset {
-    fn from_loaded_matrix(session_id: String, matrix_name: String, vector_name: String, loaded: LoadedMatrix, target: Vec<f64>) -> Self {
+    fn from_loaded_matrix(session_id: String, matrix_name: String, vector_name: String, loaded: RawDataset, target: Vec<f64>) -> Self {
         Self {
             session_id,
             matrix_name,
@@ -89,7 +89,9 @@ impl SessionStore {
             .unwrap_or("vector.csv")
             .to_string();
 
-        let (loaded_matrix, target) = load_dataset(matrix_path, vector_path)?;
+        let loaded_matrix = load_dataset(matrix_path, vector_path)
+            .map_err(|error| QsarError::InvalidDataset(error.to_string()))?;
+        let target = loaded_matrix.y.to_vec();
 
         if loaded_matrix.frame.height() != target.len() {
             return Err(QsarError::InvalidDataset(
