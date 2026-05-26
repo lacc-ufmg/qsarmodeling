@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["apps/desktop/src-tauri"]
+members = ["src-tauri"]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.3.1"
+# description = "A Tauri App"
+authors = ["Heliton Martins <helitonmrf@gmail.com>"]
+edition = "2021"

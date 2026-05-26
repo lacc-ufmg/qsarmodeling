@@ -1,8 +1,14 @@
 {
     "recommendations": [
         "yzhang.markdown-all-in-one",
-        "ms-python.python",
-        "ms-python.vscode-pylance",
-        "tauri-apps.tauri-vscode"
+        "tauri-apps.tauri-vscode",
+        "vadimcn.vscode-lldb",
+        "nefrob.vscode-just-syntax",
+        "rust-lang.rust-analyzer",
+        "mechatroner.rainbow-csv",
+        "christian-kohler.npm-intellisense",
+        "pkief.material-icon-theme",
+        "tamasfe.even-better-toml",
+        "dbaeumer.vscode-eslint"
     ]
 }
