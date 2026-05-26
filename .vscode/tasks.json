@@ -7,20 +7,15 @@
       "label": "ui:dev",
       "type": "shell",
       "isBackground": true,
-      "options": {
-        "cwd": "${workspaceFolder}/apps/desktop"
-      },
       "command": "pnpm",
       "args": [
-        "dev"
+        "run",
+        "vitedev"
       ]
     },
     {
       "label": "ui:build",
       "type": "shell",
-      "options": {
-        "cwd": "${workspaceFolder}/apps/desktop"
-      },
       "command": "pnpm",
       "args": [
         "run",

@@ -25,7 +25,7 @@ serde_json = "1"
 tauri-plugin-shell = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
-qsarmodelingrs = { path = "../../../packages/qsarmodelingrs" }
+qsarmodelingrs = { path = "../packages/qsarmodelingrs" }
 uuid = "1.23.1"
 tauri-plugin-dialog = "2"
 

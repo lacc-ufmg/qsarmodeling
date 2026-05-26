@@ -33,7 +33,6 @@ pub struct CsvLayout {
 pub struct LoadedMatrix {
     pub frame: DataFrame,
     pub row_labels: Option<Vec<String>>,
-    pub layout: CsvLayout,
 }
 
 fn is_numeric(value: &str) -> bool {
@@ -196,7 +195,6 @@ pub fn load_matrix(path: impl AsRef<Path>) -> Result<LoadedMatrix> {
     Ok(LoadedMatrix {
         frame,
         row_labels,
-        layout,
     })
 }
 

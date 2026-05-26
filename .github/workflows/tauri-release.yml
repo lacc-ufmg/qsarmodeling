@@ -54,9 +54,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Cache for Turbo
-        uses: rharkor/caching-for-turbo@v2.3.12
-
       - uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -65,17 +62,17 @@ jobs:
           tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
           releaseName: v__VERSION__
           releaseBody: |
-            Early-stage release of QSARModeling. Currently available for:
+            Early-stage release of QSARModeling. This is still very experimental and therefore many bugs are known and expected.
+
+            You can use the [example datasets](https://github.com/hellmrf/qsarmodeling/tree/refs/tags/v__VERSION__/packages/qsarmodelingrs/tests/data) to test the application.
+
+            See the assets below to download this version and install.
+            Currently available for:
 
             - **Windows** (`.exe`)
             - **Ubuntu/Debian** (`.deb`)
             - **Linux** (`.AppImage`) - [run directly](https://discourse.appimage.org/t/how-to-run-an-appimage/80)
             or install with something like [AppImageLauncher](https://appimagelauncher.com/).
-
-            See the assets to download this version and install.
-
-            You can use the [example datasets](https://github.com/hellmrf/qsarmodeling/tree/refs/tags/v0.3.0/packages/qsarmodelingrs/tests/data) to test the application.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
-          projectPath: "./apps/desktop"

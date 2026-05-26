@@ -13,9 +13,8 @@ Não podemos ignorar a existência de muitas funcionalidades no [QSARModelingPy]
 
 Para evitar os custos proibitivos de hospedagem, inicialmente, pensei em distribuir o *software* como um instalável (`.dmg`, `.exe`, `.AppImage` e talvez `snap` ou `flatpak` para Linux) contendo:
 
-- Frontend em Next.js (rodando no browser)
-- Backend principal em TS
-- Functions em Rust e Python
+- App Tauri (Rust)
+- Frontend em React + Vite
 
 O usuário poderia:
 
@@ -31,27 +30,29 @@ O usuário poderia:
 
 ## Desenvolvimento
 
-Atualmente, o frontend (`apps/frontend`) é Next.js e o backend (`apps/backend`) é Python/FastAPI. A escolha por Python no backend se deve à biblioteca `qsarmodelingpy` que implementa os cálculos em `numpy`, `pandas` e `scikit-learn`.
-
-De qualquer forma, as dependências são:
+As dependências são:
 
 - Node v24
-- [`uv`](https://astral.sh/uv)
+- rustup
 
-1. Instale o `pnpm` e o `turbo`:
+### Recommended IDE Setup
+
+- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+
+1. Instale o `pnpm`
 ```bash
-npm i -g pnpm turbo
+npm i -g pnpm
 ```
-2. Instale as dependências
+2. Instale as dependências Node.js
 ```bash
 pnpm install
 ```
-3. Rode o script `dev`:
+3. Instale o `rustup`
+4. Rode o script `dev`:
 ```bash
-pnpm run dev
+pnpm dev
 
 # equivale a:
-turbo run dev
+just dev
 ```
 
-Isso executará simultaneamente o backend e o frontend.

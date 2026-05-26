@@ -7,7 +7,7 @@ import type {
   SelectionSettings,
   ValidationResult,
   ValidationSettings,
-} from "../lib/mockQsarBackend";
+} from "./mockQsarBackend";
 
 export type BusyState = "idle" | "loading-data" | "filtering" | "selecting" | "validating";
 

@@ -1,21 +1,21 @@
 _default:
     @{{ quote(just_executable()) }} --list --justfile={{ quote(justfile()) }}
 
+
 dev:
-    turbo run dev
+    pnpm run dev
+alias tauridev := dev
+alias td := dev
 
-alias b := build
+
 build:
-    turbo run "desktop#build"
+    pnpm run build
+alias b := build
 
-[working-directory("apps/desktop")]
+
 vitedev:
     pnpm vite
 
-[working-directory("apps/desktop")]
-tauridev:
-    pnpm run tauri dev
-alias td := tauridev
 
 # Usage: just bump <major|minor|patch> [MESSAGE]
 [arg('notag', long="notag", value="notag", help="Don't create a git tag for the old version.")]
@@ -34,13 +34,11 @@ bump level message="" notag="":
 
     # ── 2. Cleanliness checks ────────────────────────────────────────────────
     WATCHED_FILES=(
-        "apps/desktop/src-tauri/tauri.conf.json"
-        "apps/desktop/package.json"
+        "src-tauri/tauri.conf.json"
+        "package.json"
         "pnpm-lock.yaml"
         "Cargo.toml"
         "Cargo.lock"
-        "apps/backend/pyproject.toml"
-        "apps/backend/uv.lock"
     )
 
     # Nothing may be staged
@@ -60,7 +58,7 @@ bump level message="" notag="":
     echo "✅  Working tree is clean."
 
     # ── 3. Read current version ──────────────────────────────────────────────
-    OLD_VERSION=$(jq -r '.version' apps/desktop/src-tauri/tauri.conf.json)
+    OLD_VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
 
     IFS='.' read -r V_MAJOR V_MINOR V_PATCH <<< "$OLD_VERSION"
 
@@ -96,13 +94,13 @@ bump level message="" notag="":
 
     # tauri.conf.json  (jq is the source of truth)
     jq --arg v "$NEW_VERSION" '.version = $v' \
-        apps/desktop/src-tauri/tauri.conf.json > /tmp/_tauri.conf.json \
-        && mv /tmp/_tauri.conf.json apps/desktop/src-tauri/tauri.conf.json
+        src-tauri/tauri.conf.json > /tmp/_tauri.conf.json \
+        && mv /tmp/_tauri.conf.json src-tauri/tauri.conf.json
 
     # package.json
     jq --arg v "$NEW_VERSION" '.version = $v' \
-        apps/desktop/package.json > /tmp/_package.json \
-        && mv /tmp/_package.json apps/desktop/package.json
+        package.json > /tmp/_package.json \
+        && mv /tmp/_package.json package.json
 
     # Cargo.toml — only lines that start with `version = "..."` (package entry)
     # The .bak suffix makes this portable across macOS and Linux.
@@ -111,33 +109,22 @@ bump level message="" notag="":
         Cargo.toml
     rm Cargo.toml.bak
 
-    # pyproject.toml - similar to Cargo.toml
-    sed -i.bak \
-        "s/^version = \"${OLD_VERSION}\"/version = \"${NEW_VERSION}\"/" \
-        apps/backend/pyproject.toml
-    rm apps/backend/pyproject.toml.bak
-
     echo "✅  Version updated in all source files."
 
     # ── 8. Regenerate lock files ─────────────────────────────────────────────
     echo "🔄  pnpm install..."
-    pnpm install -r
+    pnpm install
 
     echo "🔄  cargo generate-lockfile..."
     cargo generate-lockfile
 
-    echo "🔄  uv lock..."
-    uv lock --directory apps/backend
-
     # ── 9. Commit ────────────────────────────────────────────────────────────
     git add \
-        apps/desktop/src-tauri/tauri.conf.json \
-        apps/desktop/package.json \
+        src-tauri/tauri.conf.json \
+        package.json \
         Cargo.toml \
         pnpm-lock.yaml \
-        Cargo.lock \
-        apps/backend/pyproject.toml \
-        apps/backend/uv.lock
+        Cargo.lock
 
     git commit -m "🔖 Bump from v${OLD_VERSION} to v${NEW_VERSION}"
     echo "✅  Committed: 🔖 Bump from v${OLD_VERSION} to v${NEW_VERSION}"

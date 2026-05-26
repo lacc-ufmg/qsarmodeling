@@ -1,13 +1,5 @@
 {
 	"servers": {
-		"tailwindcss-server": {
-			"command": "npx",
-			"args": [
-				"-y",
-				"tailwindcss-mcp-server"
-			],
-			"type": "stdio"
-		},
 		"mantine": {
 			"command": "npx",
 			"args": [
