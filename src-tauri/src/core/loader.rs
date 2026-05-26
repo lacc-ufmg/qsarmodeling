@@ -4,7 +4,7 @@ use std::path::Path;
 
 use polars::prelude::*;
 
-use crate::error::{QsarError, Result};
+use super::error::{QsarError, Result};
 
 const INDEX_KEYWORDS: &[&str] = &[
     "molecules",
@@ -60,7 +60,10 @@ fn first_non_empty_lines(path: &Path, count: usize) -> Result<Vec<String>> {
     }
 
     if lines.is_empty() {
-        return Err(QsarError::InvalidDataset(format!("File {} is empty.", path.display())));
+        return Err(QsarError::InvalidDataset(format!(
+            "File {} is empty.",
+            path.display()
+        )));
     }
 
     Ok(lines)
@@ -92,9 +95,7 @@ pub fn detect_csv_layout(path: impl AsRef<Path>) -> Result<CsvLayout> {
     };
 
     let has_header = first_row.get(1).is_some_and(|value| !is_numeric(value));
-    let has_index = second_row
-        .first()
-        .is_some_and(|value| !is_numeric(value))
+    let has_index = second_row.first().is_some_and(|value| !is_numeric(value))
         || first_row
             .first()
             .is_some_and(|value| INDEX_KEYWORDS.contains(&value.to_lowercase().as_str()));
@@ -184,18 +185,14 @@ pub fn load_matrix(path: impl AsRef<Path>) -> Result<LoadedMatrix> {
         .columns()
         .iter()
         .map(|column| {
-            series_to_f64_values(column, 0).map(|values| {
-                Series::new(column.name().clone(), values).into_column()
-            })
+            series_to_f64_values(column, 0)
+                .map(|values| Series::new(column.name().clone(), values).into_column())
         })
         .collect();
 
     let frame = DataFrame::new(data_frame.height(), columns?)?;
 
-    Ok(LoadedMatrix {
-        frame,
-        row_labels,
-    })
+    Ok(LoadedMatrix { frame, row_labels })
 }
 
 pub fn load_vector(path: impl AsRef<Path>) -> Result<Vec<f64>> {
@@ -228,8 +225,80 @@ pub fn load_vector(path: impl AsRef<Path>) -> Result<Vec<f64>> {
     Ok(values)
 }
 
-pub fn load_dataset(matrix_path: impl AsRef<Path>, vector_path: impl AsRef<Path>) -> Result<(LoadedMatrix, Vec<f64>)> {
+pub fn load_dataset(
+    matrix_path: impl AsRef<Path>,
+    vector_path: impl AsRef<Path>,
+) -> Result<(LoadedMatrix, Vec<f64>)> {
     let matrix = load_matrix(matrix_path)?;
     let y = load_vector(vector_path)?;
     Ok((matrix, y))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn load_dream_dataset() {
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let base = manifest.join("examples/data/dream");
+        let x = base.join("X.csv");
+        let y = base.join("y.csv");
+
+        let (matrix, yvec) = load_dataset(&x, &y).expect("load dataset");
+
+        // X.csv is expected to be 37 rows x 408 columns (with index column removed)
+        assert_eq!(matrix.frame.height(), 37, "unexpected number of rows");
+        assert_eq!(
+            matrix.frame.width(),
+            408,
+            "unexpected number of descriptors"
+        );
+        assert!(
+            matrix.row_labels.is_some(),
+            "expected row labels from index column"
+        );
+
+        // y should have 37 entries
+        assert_eq!(yvec.len(), 37, "unexpected target vector length");
+    }
+
+    #[test]
+    fn load_carbox_dataset() {
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let base = manifest.join("examples/data/carbox");
+        let x = base.join("X.csv");
+        let y = base.join("y.csv");
+
+        let (matrix, yvec) = load_dataset(&x, &y).expect("load dataset");
+
+        assert_eq!(matrix.frame.height(), 49, "unexpected number of rows");
+        assert_eq!(
+            matrix.frame.width(),
+            12260,
+            "unexpected number of descriptors"
+        );
+        // assert!(matrix.row_labels.is_some(), "expected row labels from index column");
+
+        assert_eq!(yvec.len(), 49, "unexpected target vector length");
+    }
+
+    #[test]
+    fn load_carbox_dataset_big() {
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let base = manifest.join("examples/data/carbox");
+        let x = base.join("X_big.csv");
+        let y = base.join("y.csv");
+
+        let (matrix, _yvec) = load_dataset(&x, &y).expect("load dataset");
+
+        assert_eq!(matrix.frame.height(), 49, "unexpected number of rows");
+        assert_eq!(
+            matrix.frame.width(),
+            34820,
+            "unexpected number of descriptors"
+        );
+        // assert!(matrix.row_labels.is_some(), "expected row labels from index column");
+    }
 }

@@ -1,5 +1,5 @@
 use chrono::Local;
-use qsarmodelingrs::{load_dataset as qsar_load_dataset, filter_matrix, LoadedMatrix, run_ops, SelectionSettings as QsarSelectionSettings};
+use crate::core::{load_dataset as qsar_load_dataset, filter_matrix, LoadedMatrix, run_ops, SelectionSettings as QsarSelectionSettings};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
@@ -545,7 +545,7 @@ pub async fn run_descriptor_filters(
         (session_id, matrix_name, vector_name, settings, matrix, y)
     };
 
-    let qsar_settings = qsarmodelingrs::FilterSettings {
+    let qsar_settings = crate::core::FilterSettings {
         var_cut: settings.var_cut,
         corr_cut: settings.corr_cut,
         autocorr_cut: settings.autocorr_cut,

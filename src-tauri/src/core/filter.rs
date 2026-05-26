@@ -1,7 +1,7 @@
 use polars::prelude::*;
 
-use crate::error::{QsarError, Result};
-use crate::types::FilterSettings;
+use super::error::{QsarError, Result};
+use super::types::FilterSettings;
 
 #[derive(Debug, Clone)]
 pub struct FilteredMatrix {

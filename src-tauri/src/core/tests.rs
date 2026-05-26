@@ -16,7 +16,7 @@ fn detects_header_and_index_columns() {
         "name,a,b,c\nrow1,1.0,2.0,3.0\nrow2,4.0,5.0,6.0\n",
     );
 
-    let layout = detect_csv_layout(&path).expect("layout");
+    let layout = loader::detect_csv_layout(&path).expect("layout");
     assert!(layout.has_header);
     assert!(layout.has_index);
     assert_eq!(layout.delimiter, b',');
@@ -32,12 +32,12 @@ fn loads_matrix_and_vector_and_filters_with_cache() {
     );
     let vector = write_temp_file(&dir, "vector.csv", "1.0\n2.0\n3.0\n4.0\n");
 
-    let mut store = SessionStore::new();
+    let mut store = session::SessionStore::new();
     let profile = store.load_dataset(&matrix, &vector).expect("load dataset");
 
     assert_eq!(profile.rows, 4);
     assert_eq!(profile.descriptors, 3);
-    assert_eq!(profile.source, DatasetSource::Uploaded);
+    assert_eq!(profile.source, types::DatasetSource::Uploaded);
 
     let session_id = profile.session_id.clone();
     let filtered = store
@@ -53,7 +53,7 @@ fn loads_matrix_and_vector_and_filters_with_cache() {
         )
         .expect("filter dataset");
 
-    assert_eq!(filtered.profile.source, DatasetSource::Filtered);
+    assert_eq!(filtered.profile.source, types::DatasetSource::Filtered);
     assert!(!filtered.frame.get_column_names().is_empty());
 
     let cached = store
@@ -83,7 +83,7 @@ fn lj_transform_changes_large_values() {
     );
     let vector = write_temp_file(&dir, "vector.csv", "1.0\n2.0\n3.0\n");
 
-    let mut store = SessionStore::new();
+    let mut store = session::SessionStore::new();
     let profile = store.load_dataset(&matrix, &vector).expect("load dataset");
     let filtered = store
         .filter_dataset(

@@ -1,6 +1,7 @@
+pub mod core;
+mod workflow;
 use serde::Serialize;
 
-mod workflow;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

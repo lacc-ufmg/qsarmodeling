@@ -1,6 +1,6 @@
 use polars::prelude::*;
-use crate::error::{QsarError, Result};
-use crate::types::{SelectionSettings, SelectionResult};
+use super::error::{QsarError, Result};
+use super::types::{SelectionSettings, SelectionResult};
 
 fn dataframe_to_matrix_rows(frame: &DataFrame) -> Result<Vec<Vec<f64>>> {
     let height = frame.height();

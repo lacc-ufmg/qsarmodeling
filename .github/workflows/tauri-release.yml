@@ -64,7 +64,7 @@ jobs:
           releaseBody: |
             Early-stage release of QSARModeling. This is still very experimental and therefore many bugs are known and expected.
 
-            You can use the [example datasets](https://github.com/hellmrf/qsarmodeling/tree/refs/tags/v__VERSION__/packages/qsarmodelingrs/tests/data) to test the application.
+            You can use the [example datasets](https://github.com/hellmrf/qsarmodeling/tree/refs/tags/v__VERSION__/src-tauri/examples/data) to test the application.
 
             See the assets below to download this version and install.
             Currently available for:

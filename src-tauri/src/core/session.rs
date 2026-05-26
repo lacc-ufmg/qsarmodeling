@@ -3,10 +3,10 @@ use std::path::Path;
 
 use polars::prelude::*;
 
-use crate::error::{QsarError, Result};
-use crate::filter::{filter_matrix_from_original, FilteredMatrix};
-use crate::loader::{load_dataset, LoadedMatrix};
-use crate::types::{DatasetProfile, DatasetSource, FilterCacheKey, FilterSettings};
+use super::error::{QsarError, Result};
+use super::filter::{filter_matrix_from_original};
+use super::loader::{load_dataset, LoadedMatrix};
+use super::types::{DatasetProfile, DatasetSource, FilterCacheKey, FilterSettings};
 
 #[derive(Debug, Clone)]
 pub struct LoadedDataset {
