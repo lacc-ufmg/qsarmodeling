@@ -72,5 +72,19 @@
         "installMode": "currentUser"
       }
     }
+  },
+  "plugins": {
+    "typegen": {
+      "excludePatterns": null,
+      "force": false,
+      "includePatterns": null,
+      "includePrivate": false,
+      "outputPath": "../src/generated",
+      "projectPath": ".",
+      "typeMappings": null,
+      "validationLibrary": "none",
+      "verbose": false,
+      "visualizeDeps": false
+    }
   }
 }

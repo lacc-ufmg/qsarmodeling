@@ -29,6 +29,7 @@ build
 dist
 dist-ssr
 *.local
+src/generated/
 
 # Misc
 .DS_Store
