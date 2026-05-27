@@ -16,7 +16,7 @@ import { LoadDataPanel } from "./components/workflow/LoadDataPanel";
 import { FilterPanel } from "./components/workflow/FilterPanel";
 import icon from "./assets/icon.png";
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { appInfo } from "./generated";
 
 export default function App () {
   const { toggleColorScheme } = useMantineColorScheme();
@@ -24,8 +24,8 @@ export default function App () {
   const [version, setVersion] = useState("0.x.x");
 
   useEffect(() => {
-    invoke("app_info")
-      .then(({version}: any) => setVersion(version))
+    appInfo()
+      .then(({ version }) => setVersion(version))
       .catch((err) => {
         console.error("Failed to get app version:", err);
       });
