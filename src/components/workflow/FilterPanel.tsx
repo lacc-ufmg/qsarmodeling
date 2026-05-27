@@ -78,7 +78,6 @@ export function FilterPanel ({
             </Box>
           </Paper>
 
-          <ExpandableSection title="Fine-tune settings">
             <Stack gap="sm">
               <Checkbox
                 label={
@@ -92,20 +91,7 @@ export function FilterPanel ({
                 checked={filterSettings.autoscale}
                 onChange={(e) => onSettingsChange({ autoscale: e.currentTarget.checked })}
               />
-              <Checkbox
-                label={
-                  <Text size="sm">
-                    LJ transform{" "}
-                    <Text span c="dimmed">
-                      (apply Lennard-Jones descriptor transformation)
-                    </Text>
-                  </Text>
-                }
-                checked={filterSettings.ljTransform}
-                onChange={(e) => onSettingsChange({ ljTransform: e.currentTarget.checked })}
-              />
             </Stack>
-          </ExpandableSection>
 
           <Box>
             <Button

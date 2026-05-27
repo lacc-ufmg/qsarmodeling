@@ -14,6 +14,7 @@ import { useQsarWorkflow } from "./hooks/useQsarWorkflow";
 import { ColorSchemeToggle } from "./components/ui/ColorSchemeToggle";
 import { LoadDataPanel } from "./components/workflow/LoadDataPanel";
 import { FilterPanel } from "./components/workflow/FilterPanel";
+import { SelectionPanel } from "./components/workflow/SelectionPanel";
 import icon from "./assets/icon.png";
 import { useState, useEffect } from "react";
 import { appInfo } from "./generated";
@@ -101,6 +102,16 @@ export default function App () {
               isDisabled={!selectors.canRunFilters}
               onSettingsChange={actions.updateFilterSettings}
               onRunFilters={actions.runDescriptorFilters}
+            />
+
+            <SelectionPanel
+              activeDataset={state.activeDataset}
+              selectionResult={state.selectionResult}
+              selectionSettings={state.selectionSettings}
+              isLoading={state.busyState === "selecting"}
+              isDisabled={!selectors.canRunSelection}
+              onSettingsChange={actions.updateSelectionSettings}
+              onRunSelection={actions.runVariableSelection}
             />
           </Stack>
         </Container>

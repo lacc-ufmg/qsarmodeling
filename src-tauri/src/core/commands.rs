@@ -2,10 +2,11 @@ use std::path::Path;
 
 use tauri::State;
 
-use crate::core::loader::DatasetMetadata;
+use super::loader::DatasetMetadata;
+use super::ops::{OpsConfig, OpsResult};
 
-use super::session::SessionState;
 use super::filter::{FilterConfig, FilterResult};
+use super::session::SessionState;
 
 #[tauri::command]
 pub async fn load_dataset_cmd(
@@ -22,6 +23,14 @@ pub async fn apply_filter_cmd(
     config: FilterConfig,
 ) -> Result<FilterResult, String> {
     state.apply_filter(config)
+}
+
+#[tauri::command]
+pub async fn run_selection_cmd(
+    state: State<'_, SessionState>,
+    settings: OpsConfig,
+) -> Result<OpsResult, String> {
+    state.run_ops(settings)
 }
 
 #[tauri::command]

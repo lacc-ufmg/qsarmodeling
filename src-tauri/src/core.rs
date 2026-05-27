@@ -3,7 +3,7 @@ pub mod filter;
 pub mod loader;
 pub mod session;
 pub mod types;
-// pub mod ops;
+pub mod ops;
 pub mod commands;
 
 pub use filter::*;
