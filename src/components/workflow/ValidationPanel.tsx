@@ -4,7 +4,33 @@ import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import { ExpandableSection } from "../ui/ExpandableSection";
 import { NumberFieldWithTooltip } from "../ui/NumberFieldWithTooltip";
-import type { ValidationResult, ValidationSettings } from "../../lib/mockQsarBackend";
+
+type ValidationResult = {
+  cv?: {
+    q2: number;
+  } | null;
+  yr?: {
+    score: number;
+    passed: boolean;
+  } | null;
+  lno?: {
+    score: number;
+    passed: boolean;
+  } | null;
+  ext?: {
+    r2Pred: number;
+  } | null;
+};
+
+type ValidationSettings = {
+  runCrossValidation: boolean;
+  runYRandomization: boolean;
+  runLNO: boolean;
+  runExternalValidation: boolean;
+  yrandCutoff: number;
+  lnoCutoff: number;
+  testSetRatio: number;
+};
 
 type ValidationPanelProps = {
   selectionResult: boolean;

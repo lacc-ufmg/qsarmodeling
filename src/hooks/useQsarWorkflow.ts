@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { DatasetMetadata, FilterConfig } from "../generated";
-import { applyFilterCmd, loadDatasetCmd } from "../generated";
+import type { DatasetMetadata, FilterConfig, OpsResult, OpsConfig } from "../generated";
+import { applyFilterCmd, loadDatasetCmd, runSelectionCmd } from "../generated";
 
 type WorkflowState = {
   matrixFilePath: string | null;
@@ -9,9 +9,11 @@ type WorkflowState = {
   uploadedDataset: DatasetMetadata | null;
   activeDataset: DatasetMetadata | null;
   isFiltered: boolean;
-  busyState: "idle" | "loading-data" | "filtering";
+  selectionResult: OpsResult | null;
+  busyState: "idle" | "loading-data" | "filtering" | "selecting";
   error: string | null;
   filterSettings: FilterConfig;
+  selectionSettings: OpsConfig;
 };
 
 function toErrorMessage(error: unknown, fallback: string): string {
@@ -25,6 +27,7 @@ export function useQsarWorkflow() {
   const [uploadedDataset, setUploadedDataset] = useState<DatasetMetadata | null>(null);
   const [activeDataset, setActiveDataset] = useState<DatasetMetadata | null>(null);
   const [isFiltered, setIsFiltered] = useState(false);
+  const [selectionResult, setSelectionResult] = useState<OpsResult | null>(null);
 
   const [busyState, setBusyState] = useState<WorkflowState["busyState"]>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -34,11 +37,21 @@ export function useQsarWorkflow() {
     correlationCut: 0.25,
     autocorrelationCut: 0.85,
     autoscale: true,
-    ljTransform: false,
+  });
+
+  const [selectionSettings, setSelectionSettings] = useState<OpsConfig>({
+    latentVarsOps: 3,
+    latentVarsModel: 3,
+    varsPercentage: 0.5,
+    minVarsModel: 2,
   });
 
   const updateFilterSettings = useCallback((patch: Partial<FilterConfig>) => {
     setFilterSettings((s) => ({ ...s, ...patch }));
+  }, []);
+
+  const updateSelectionSettings = useCallback((patch: Partial<OpsConfig>) => {
+    setSelectionSettings((s) => ({ ...s, ...patch }));
   }, []);
 
   const selectMatrixFile = useCallback(async () => {
@@ -75,6 +88,7 @@ export function useQsarWorkflow() {
       setUploadedDataset(meta);
       setActiveDataset(meta);
       setIsFiltered(false);
+      setSelectionResult(null);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err, "Failed to load dataset."));
@@ -99,6 +113,7 @@ export function useQsarWorkflow() {
 
       setActiveDataset(newActive);
       setIsFiltered(true);
+      setSelectionResult(null);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err, "Failed to run descriptor filters."));
@@ -107,9 +122,25 @@ export function useQsarWorkflow() {
     }
   }, [uploadedDataset, filterSettings]);
 
+  const runVariableSelection = useCallback(async () => {
+    if (!activeDataset) return;
+
+    try {
+      setBusyState("selecting");
+      const result = await runSelectionCmd({ settings: selectionSettings });
+      setSelectionResult(result);
+      setError(null);
+    } catch (err) {
+      setError(toErrorMessage(err, "Failed to run variable selection."));
+    } finally {
+      setBusyState("idle");
+    }
+  }, [activeDataset, selectionSettings]);
+
   const isIdle = busyState === "idle";
   const canLoadData = Boolean(matrixFilePath && vectorFilePath) && isIdle;
   const canRunFilters = Boolean(activeDataset) && isIdle;
+  const canRunSelection = Boolean(activeDataset) && isIdle;
   const canRunPipeline = false;
 
   const state = useMemo<WorkflowState>(
@@ -119,11 +150,24 @@ export function useQsarWorkflow() {
       uploadedDataset,
       activeDataset,
       isFiltered,
+      selectionResult,
       busyState,
       error,
       filterSettings,
+      selectionSettings,
     }),
-    [activeDataset, busyState, error, filterSettings, isFiltered, matrixFilePath, uploadedDataset, vectorFilePath],
+    [
+      activeDataset,
+      busyState,
+      error,
+      filterSettings,
+      isFiltered,
+      matrixFilePath,
+      selectionResult,
+      selectionSettings,
+      uploadedDataset,
+      vectorFilePath,
+    ],
   );
 
   return {
@@ -134,12 +178,15 @@ export function useQsarWorkflow() {
       clearMatrixFile,
       clearVectorFile,
       updateFilterSettings,
+      updateSelectionSettings,
       loadData,
       runDescriptorFilters,
+      runVariableSelection,
     },
     selectors: {
       canLoadData,
       canRunFilters,
+      canRunSelection,
       canRunPipeline,
       isIdle,
     },

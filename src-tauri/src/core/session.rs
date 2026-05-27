@@ -2,10 +2,11 @@ use ndarray::Array2;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use crate::core::loader::DatasetMetadata;
+use super::loader::DatasetMetadata;
+use super::ops::{OpsResult, OpsConfig};
 
-use super::loader::RawDataset;
 use super::filter::{FilterConfig, FilterPipeline, FilterResult};
+use super::loader::RawDataset;
 
 pub struct SessionState {
     inner: Mutex<SessionInner>,
@@ -32,6 +33,18 @@ impl SessionState {
 
     pub fn get_dataset(&self) -> Option<Arc<RawDataset>> {
         self.inner.lock().unwrap().dataset.clone()
+    }
+
+    pub fn run_ops(&self, config: OpsConfig) -> Result<OpsResult, String> {
+        let dataset = self.get_dataset().ok_or("No dataset loaded")?;
+
+        // Materialize X (after filtering)
+        let x = self.materialize_last_x()?;
+        let y = dataset.y.clone();
+
+        // Run OPS
+        let result = super::ops::run_ops(&x, &y, &config);
+        Ok(result)
     }
 
     pub fn load_dataset(&self, x_path: &Path, y_path: &Path) -> Result<DatasetMetadata, String> {
@@ -66,16 +79,10 @@ impl SessionState {
     // =============================
     // Filtering
     // =============================
-    pub fn apply_filter(
-        &self,
-        config: FilterConfig,
-    ) -> Result<FilterResult, String> {
+    pub fn apply_filter(&self, config: FilterConfig) -> Result<FilterResult, String> {
         let mut inner = self.inner.lock().unwrap();
 
-        let pipeline = inner
-            .pipeline
-            .as_ref()
-            .ok_or("No dataset loaded")?;
+        let pipeline = inner.pipeline.as_ref().ok_or("No dataset loaded")?;
 
         // Run filter (fast: stats already cached)
         let result = pipeline.run(&config);
