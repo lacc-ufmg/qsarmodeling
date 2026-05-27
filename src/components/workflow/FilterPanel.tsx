@@ -4,16 +4,17 @@ import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import { ExpandableSection } from "../ui/ExpandableSection";
 import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
-import type { DatasetProfile, FilterSettings } from "../../lib/mockQsarBackend";
+import type { DatasetMetadata, FilterConfig } from "../../generated";
 import { StatsRing } from "../ui/StatsRing";
 
 type FilterPanelProps = {
-  uploadedDataset: DatasetProfile | null;
-  activeDataset: DatasetProfile | null;
-  filterSettings: FilterSettings;
+  uploadedDataset: DatasetMetadata | null;
+  activeDataset: DatasetMetadata | null;
+  filterSettings: FilterConfig;
+  isFiltered: boolean;
   isLoading: boolean;
   isDisabled: boolean;
-  onSettingsChange: (patch: Partial<FilterSettings>) => void;
+  onSettingsChange: (patch: Partial<FilterConfig>) => void;
   onRunFilters: () => void;
 };
 
@@ -21,12 +22,13 @@ export function FilterPanel ({
   uploadedDataset,
   activeDataset,
   filterSettings,
+  isFiltered,
   isLoading,
   isDisabled,
   onSettingsChange,
   onRunFilters,
 }: FilterPanelProps) {
-  const isComplete = activeDataset?.source === "filtered";
+  const isComplete = isFiltered;
 
   return (
     <StepCard
@@ -46,32 +48,32 @@ export function FilterPanel ({
               <SliderFieldWithTooltip
                 label="Variance cut"
                 help="Removes descriptors with low variance across samples. Higher values filter more aggressively."
-                value={filterSettings.varCut}
+                value={filterSettings.varianceCut}
                 min={0}
                 max={1}
                 step={0.01}
-                onChange={(v) => onSettingsChange({ varCut: v })}
+                onChange={(v) => onSettingsChange({ varianceCut: v })}
               />
 
               <SliderFieldWithTooltip
                 label="Correlation cut"
                 help="Removes highly correlated descriptors to reduce multicollinearity. Higher values filter more aggressively."
-                value={filterSettings.corrCut}
+                value={filterSettings.correlationCut}
                 min={0}
                 max={1}
                 step={0.01}
-                onChange={(v) => onSettingsChange({ corrCut: v })}
+                onChange={(v) => onSettingsChange({ correlationCut: v })}
               />
 
               <SliderFieldWithTooltip
                 label="Autocorrelation cut"
                 help="Removes descriptors with high autocorrelation within themselves. Lower values filter more aggressively."
                 inverted
-                value={filterSettings.autocorrCut}
+                value={filterSettings.autocorrelationCut}
                 min={0}
                 max={1}
                 step={0.01}
-                onChange={(v) => onSettingsChange({ autocorrCut: v })}
+                onChange={(v) => onSettingsChange({ autocorrelationCut: v })}
               />
             </Box>
           </Paper>
@@ -128,15 +130,15 @@ export function FilterPanel ({
           <StatsRing stats={[
             {
               label: "Active descriptors",
-              stats: activeDataset.descriptors.toString(),
-              progress: (activeDataset.descriptors / uploadedDataset.descriptors) * 100,
+              stats: activeDataset.n_features.toString(),
+              progress: (activeDataset.n_features / uploadedDataset.n_features) * 100,
               color: "blue",
               icon: <IconCheck />,
             },
             {
               label: "Removed",
-              stats: (uploadedDataset.descriptors - activeDataset.descriptors).toString(),
-              progress: (1 - activeDataset.descriptors / uploadedDataset.descriptors) * 100,
+              stats: (uploadedDataset.n_features - activeDataset.n_features).toString(),
+              progress: (1 - activeDataset.n_features / uploadedDataset.n_features) * 100,
               color: "red",
               icon: <IconX />,
             },

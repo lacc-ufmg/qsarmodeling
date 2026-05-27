@@ -14,9 +14,6 @@ import { useQsarWorkflow } from "./hooks/useQsarWorkflow";
 import { ColorSchemeToggle } from "./components/ui/ColorSchemeToggle";
 import { LoadDataPanel } from "./components/workflow/LoadDataPanel";
 import { FilterPanel } from "./components/workflow/FilterPanel";
-import { SelectionPanel } from "./components/workflow/SelectionPanel";
-import { ValidationPanel } from "./components/workflow/ValidationPanel";
-import { WorkflowTimeline } from "./components/workflow/WorkflowTimeline";
 import icon from "./assets/icon.png";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -99,40 +96,12 @@ export default function App () {
               uploadedDataset={state.uploadedDataset}
               activeDataset={state.activeDataset}
               filterSettings={state.filterSettings}
+              isFiltered={state.isFiltered}
               isLoading={state.busyState === "filtering"}
               isDisabled={!selectors.canRunFilters}
               onSettingsChange={actions.updateFilterSettings}
               onRunFilters={actions.runDescriptorFilters}
             />
-
-            {/* Step 3: Select Variables */}
-            <SelectionPanel
-              activeDataset={state.activeDataset}
-              selectionResult={state.selectionResult}
-              selectionSettings={state.selectionSettings}
-              isLoading={state.busyState === "selecting"}
-              isDisabled={!selectors.canRunSelection}
-              onSettingsChange={actions.updateSelectionSettings}
-              onRunSelection={actions.runVariableSelection}
-            />
-
-            {/* Step 4: Validate Model */}
-            <ValidationPanel
-              selectionResult={Boolean(state.selectionResult)}
-              validationResult={state.validationResult}
-              validationSettings={state.validationSettings}
-              isLoading={state.busyState === "validating"}
-              isValidating={state.busyState === "validating"}
-              isPipelineRunning={state.busyState !== "idle" && state.busyState !== "validating"}
-              isDisabled={!selectors.canRunValidation}
-              canRunPipeline={selectors.canRunPipeline}
-              onSettingsChange={actions.updateValidationSettings}
-              onRunValidation={actions.runValidationSuite}
-              onRunPipeline={actions.runFullPipeline}
-            />
-
-            {/* Workflow Timeline */}
-            <WorkflowTimeline history={state.history} />
           </Stack>
         </Container>
       </AppShell.Main>

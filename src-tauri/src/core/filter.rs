@@ -1,202 +1,322 @@
-use polars::prelude::*;
+use ndarray::{Array2, ArrayView1};
+use std::sync::Arc;
+use serde::{Serialize, Deserialize};
 
-use super::error::{QsarError, Result};
-use super::types::FilterSettings;
+use super::loader::RawDataset;
 
+// =============================
+// Filter configuration
+// =============================
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilterConfig {
+    pub variance_cut: f64,
+    pub correlation_cut: f64,
+    pub autocorrelation_cut: f64,
+    pub autoscale: bool,
+    pub lj_transform: bool,
+}
+
+// =============================
+// Column statistics (cached)
+// =============================
 #[derive(Debug, Clone)]
-pub struct FilteredMatrix {
-    pub frame: DataFrame,
-    pub selected_indices: Vec<usize>,
+struct ColumnStats {
+    pub mean: f64,
+    pub var: f64,
+    pub std: f64,
 }
 
-fn series_to_vec(series: &Column) -> Result<Vec<f64>> {
-    let series = series.as_materialized_series().cast(&DataType::Float64)?;
-    let chunked = series.f64()?;
+// =============================
+// Filter state (core structure)
+// =============================
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilterState {
+    pub mask: Vec<bool>,
+    pub kept: Vec<usize>,
+    pub dropped_by_filter: Vec<(String, usize)>,
+}
 
-    if chunked.null_count() > 0 {
-        return Err(QsarError::InvalidDataset(format!(
-            "Column '{}' contains null values.",
-            series.name()
-        )));
+impl FilterState {
+    pub fn new(n_features: usize) -> Self {
+        Self {
+            mask: vec![true; n_features],
+            kept: (0..n_features).collect(),
+            dropped_by_filter: Vec::new(),
+        }
+    }
+}
+
+// =============================
+// Pipeline object
+// =============================
+pub struct FilterPipeline {
+    dataset: Arc<RawDataset>,
+    stats: Arc<Vec<ColumnStats>>,
+}
+
+impl FilterPipeline {
+    pub fn new(dataset: Arc<RawDataset>) -> Self {
+        let stats = Arc::new(compute_column_stats(&dataset.x));
+        Self { dataset, stats }
     }
 
-    Ok(chunked.into_no_null_iter().collect())
+    pub fn run(&self, config: &FilterConfig) -> FilterResult {
+        let mut state = FilterState::new(self.dataset.n_features);
+
+        // Optional autoscaling
+        let normalized = if config.autoscale {
+            Some(normalize_columns(&self.dataset.x, &self.stats))
+        } else {
+            None
+        };
+
+        let x = normalized
+            .as_ref()
+            .map(|a| a.view())
+            .unwrap_or_else(|| self.dataset.x.view());
+
+        // Sequential filters
+        apply_variance_filter(&mut state, &self.stats, config.variance_cut);
+        apply_correlation_filter(&mut state, x, config.correlation_cut);
+        apply_autocorrelation_filter(&mut state, x, &self.stats, config.autocorrelation_cut);
+
+        FilterResult { state }
+    }
 }
 
-fn dataframe_to_matrix(frame: &DataFrame) -> Result<Vec<Vec<f64>>> {
-    frame
-    .columns()
-        .iter()
-        .map(series_to_vec)
-        .collect()
+// =============================
+// Result
+// =============================
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilterResult {
+    pub state: FilterState,
 }
 
-fn select_columns_by_indices(frame: &DataFrame, indices: &[usize]) -> Result<DataFrame> {
-    let column_names = frame.get_column_names();
-    let selected_names = indices
-        .iter()
-        .map(|index| {
-            column_names.get(*index).map(|name| name.as_str()).ok_or_else(|| {
-                QsarError::InvalidDataset(format!("Column index {} is out of bounds.", index))
+// =============================
+// Stats computation
+// =============================
+fn compute_column_stats(x: &Array2<f64>) -> Vec<ColumnStats> {
+    let mut stats = Vec::with_capacity(x.ncols());
+
+    for col in x.columns() {
+        let mean = col.mean().unwrap_or(0.0);
+        let var = col
+            .iter()
+            .map(|v| {
+                let d = v - mean;
+                d * d
             })
-        })
-        .collect::<Result<Vec<_>>>()?;
+            .sum::<f64>()
+            / col.len() as f64;
 
-    Ok(frame.select(selected_names)?)
-}
+        let std = var.sqrt();
 
-fn mean(values: &[f64]) -> f64 {
-    values.iter().sum::<f64>() / values.len() as f64
-}
-
-fn sample_variance(values: &[f64]) -> f64 {
-    if values.len() < 2 {
-        return 0.0;
+        stats.push(ColumnStats { mean, var, std });
     }
 
-    let avg = mean(values);
-    let sum_sq = values.iter().map(|value| {
-        let delta = value - avg;
-        delta * delta
-    }).sum::<f64>();
-    sum_sq / (values.len() as f64 - 1.0)
+    stats
 }
 
-fn pearson_correlation(lhs: &[f64], rhs: &[f64]) -> f64 {
-    if lhs.len() != rhs.len() || lhs.len() < 2 {
-        return 0.0;
+// =============================
+// Normalization (autoscale)
+// =============================
+fn normalize_columns(x: &Array2<f64>, stats: &[ColumnStats]) -> Array2<f64> {
+    let mut out = x.clone();
+
+    for (j, mut col) in out.columns_mut().into_iter().enumerate() {
+        let s = &stats[j];
+
+        if s.std > 0.0 {
+            for v in col.iter_mut() {
+                *v = (*v - s.mean) / s.std;
+            }
+        }
     }
 
-    let lhs_mean = mean(lhs);
-    let rhs_mean = mean(rhs);
-    let mut covariance = 0.0;
-    let mut lhs_variance = 0.0;
-    let mut rhs_variance = 0.0;
+    out
+}
 
-    for (lhs_value, rhs_value) in lhs.iter().zip(rhs.iter()) {
-        let lhs_delta = lhs_value - lhs_mean;
-        let rhs_delta = rhs_value - rhs_mean;
-        covariance += lhs_delta * rhs_delta;
-        lhs_variance += lhs_delta * lhs_delta;
-        rhs_variance += rhs_delta * rhs_delta;
+// =============================
+// Variance filter
+// =============================
+fn apply_variance_filter(
+    state: &mut FilterState,
+    stats: &[ColumnStats],
+    threshold: f64,
+) {
+    let mut dropped = 0;
+
+    for &j in &state.kept {
+        if stats[j].var < threshold {
+            state.mask[j] = false;
+            dropped += 1;
+        }
     }
 
-    if lhs_variance == 0.0 || rhs_variance == 0.0 {
-        0.0
-    } else {
-        covariance / (lhs_variance.sqrt() * rhs_variance.sqrt())
-    }
+    rebuild_kept(state);
+    state
+        .dropped_by_filter
+        .push(("variance".into(), dropped));
 }
 
-fn autoscale(values: &[f64]) -> Vec<f64> {
-    let avg = mean(values);
-    let std_dev = sample_variance(values).sqrt();
+// =============================
+// Correlation filter (greedy)
+// =============================
+fn apply_correlation_filter(
+    state: &mut FilterState,
+    x: ndarray::ArrayView2<f64>,
+    threshold: f64,
+) {
+    let mut selected: Vec<usize> = Vec::new();
+    let mut dropped = 0;
 
-    if std_dev == 0.0 {
-        return vec![0.0; values.len()];
-    }
+    for &j in &state.kept {
+        let col_j = x.column(j);
 
-    values.iter().map(|value| (value - avg) / std_dev).collect()
-}
+        let mut keep = true;
 
-fn lj_cut(value: f64, cut: f64) -> f64 {
-    let mut transformed = value / 4.18;
-    if transformed >= cut {
-        transformed = cut + (transformed - (cut - 1.0)).log10();
-    }
-    transformed * 4.18
-}
+        for &k in &selected {
+            let col_k = x.column(k);
 
-fn apply_lj_transform(frame: &DataFrame) -> Result<DataFrame> {
-    let columns: Result<Vec<Column>> = frame
-        .columns()
-        .iter()
-        .map(|column| {
-            let values = series_to_vec(column)?;
-            let transformed: Vec<f64> = values.into_iter().map(|value| lj_cut(value, 30.0)).collect();
-            Ok(Series::new(column.name().clone(), transformed).into_column())
-        })
-        .collect();
+            let corr = fast_corr(col_j, col_k);
 
-    Ok(DataFrame::new(frame.height(), columns?)?)
-}
+            if corr.abs() > threshold {
+                keep = false;
+                break;
+            }
+        }
 
-pub fn variance_cut(frame: &DataFrame, cut: f64) -> Result<Vec<usize>> {
-    if cut == 0.0 {
-        return Ok((0..frame.width()).collect());
+        if keep {
+            selected.push(j);
+        } else {
+            state.mask[j] = false;
+            dropped += 1;
+        }
     }
 
-    let matrix = dataframe_to_matrix(frame)?;
-    Ok(matrix
-        .iter()
-        .enumerate()
-        .filter_map(|(index, values)| (sample_variance(values) >= cut).then_some(index))
-        .collect())
+    state.kept = selected;
+    state
+        .dropped_by_filter
+        .push(("correlation".into(), dropped));
 }
 
-pub fn correlation_cut(frame: &DataFrame, y: &[f64], cut: f64) -> Result<Vec<usize>> {
-    let matrix = dataframe_to_matrix(frame)?;
-    Ok(matrix
-        .iter()
-        .enumerate()
-        .filter_map(|(index, values)| (pearson_correlation(values, y).abs() >= cut).then_some(index))
-        .collect())
-}
+// =============================
+// Autocorrelation filter
+// =============================
+fn apply_autocorrelation_filter(
+    state: &mut FilterState,
+    x: ndarray::ArrayView2<f64>,
+    stats: &[ColumnStats],
+    threshold: f64,
+) {
+    let mut dropped = 0;
+    let alive = state.kept.clone(); // working set
 
-pub fn autocorrelation_cut(frame: &DataFrame, y: &[f64], cut: f64) -> Result<Vec<usize>> {
-    let matrix = dataframe_to_matrix(frame)?;
-    let mut dropped = vec![false; matrix.len()];
+    let mut to_drop = vec![false; x.ncols()];
 
-    for left in 0..matrix.len() {
-        for right in (left + 1)..matrix.len() {
-            let correlation = pearson_correlation(&matrix[left], &matrix[right]);
-            if correlation > cut {
-                let left_corr = pearson_correlation(&matrix[left], y).abs();
-                let right_corr = pearson_correlation(&matrix[right], y).abs();
+    for i in 0..alive.len() {
+        let j = alive[i];
 
-                if left_corr < right_corr {
-                    dropped[left] = true;
+        if to_drop[j] {
+            continue;
+        }
+
+        let col_j = x.column(j);
+
+        for k_idx in (i + 1)..alive.len() {
+            let k = alive[k_idx];
+
+            if to_drop[k] {
+                continue;
+            }
+
+            let col_k = x.column(k);
+
+            let corr = fast_corr(col_j, col_k);
+
+            if corr.abs() > threshold {
+                // Drop one based on variance
+                if stats[j].var >= stats[k].var {
+                    to_drop[k] = true;
                 } else {
-                    dropped[right] = true;
+                    to_drop[j] = true;
+                    break; // j is gone, stop comparing it
                 }
             }
         }
     }
 
-    Ok(dropped
-        .iter()
-        .enumerate()
-        .filter_map(|(index, is_dropped)| (!is_dropped).then_some(index))
-        .collect())
-}
-
-pub fn filter_matrix(frame: &DataFrame, y: &[f64], settings: FilterSettings) -> Result<FilteredMatrix> {
-    let mut filtered = if settings.lj_transform {
-        apply_lj_transform(frame)?
-    } else {
-        frame.clone()
-    };
-
-    let variance_indices = variance_cut(&filtered, settings.var_cut)?;
-    filtered = select_columns_by_indices(&filtered, &variance_indices)?;
-
-    let corr_indices = correlation_cut(&filtered, y, settings.corr_cut)?;
-    filtered = select_columns_by_indices(&filtered, &corr_indices)?;
-
-    let autocorr_indices = autocorrelation_cut(&filtered, y, settings.autocorr_cut)?;
-    let selected_indices = autocorr_indices;
-    filtered = select_columns_by_indices(&filtered, &selected_indices)?;
-
-    if filtered.width() == 0 {
-        return Err(QsarError::EmptyFilterResult);
+    // Apply drops
+    for &j in &alive {
+        if to_drop[j] {
+            state.mask[j] = false;
+            dropped += 1;
+        }
     }
 
-    Ok(FilteredMatrix {
-        frame: filtered,
-        selected_indices,
-    })
+    rebuild_kept(state);
+
+    state
+        .dropped_by_filter
+        .push(("autocorrelation".into(), dropped));
 }
 
-pub fn filter_matrix_from_original(frame: &DataFrame, y: &[f64], settings: FilterSettings) -> Result<FilteredMatrix> {
-    filter_matrix(frame, y, settings)
+// =============================
+// Fast correlation (dot-based)
+// =============================
+fn fast_corr(a: ArrayView1<f64>, b: ArrayView1<f64>) -> f64 {
+    let mean_a = a.mean().unwrap_or(0.0);
+    let mean_b = b.mean().unwrap_or(0.0);
+
+    let mut num = 0.0;
+    let mut da = 0.0;
+    let mut db = 0.0;
+
+    for i in 0..a.len() {
+        let xa = a[i] - mean_a;
+        let xb = b[i] - mean_b;
+
+        num += xa * xb;
+        da += xa * xa;
+        db += xb * xb;
+    }
+
+    if da == 0.0 || db == 0.0 {
+        0.0
+    } else {
+        num / (da.sqrt() * db.sqrt())
+    }
+}
+
+// =============================
+// Helpers
+// =============================
+fn rebuild_kept(state: &mut FilterState) {
+    state.kept = state
+        .mask
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &k)| if k { Some(i) } else { None })
+        .collect();
+}
+
+// =============================
+// Final materialization
+// =============================
+pub fn materialize(
+    dataset: &RawDataset,
+    state: &FilterState,
+) -> Array2<f64> {
+    let n = dataset.n_samples;
+    let m = state.kept.len();
+
+    let mut out = Array2::<f64>::zeros((n, m));
+
+    for (new_j, &old_j) in state.kept.iter().enumerate() {
+        out.column_mut(new_j).assign(&dataset.x.column(old_j));
+    }
+
+    out
 }

@@ -17,6 +17,7 @@ use anyhow::{bail, Context, Result};
 use csv::ReaderBuilder;
 use ndarray::{Array1, Array2, ShapeBuilder};
 use polars::prelude::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct RawDataset {
@@ -32,9 +33,38 @@ pub struct RawDataset {
     /// Row labels from the X index column, if present.
     pub row_labels: Option<Vec<String>>,
     /// Feature names from the X header row, if present.
-    pub x_labels: Option<Vec<String>>,
+    pub feature_labels: Option<Vec<String>>,
     /// Sample labels from the X index column (or y.csv index), if present.
-    pub y_labels: Option<Vec<String>>,
+    pub sample_labels: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatasetMetadata {
+    pub n_samples: usize,
+    pub n_features: usize,
+    pub feature_labels: Option<Vec<String>>,
+    pub sample_labels: Option<Vec<String>>,
+}
+
+impl From<&Arc<RawDataset>> for DatasetMetadata {
+    fn from(raw: &Arc<RawDataset>) -> Self {
+        Self {
+            n_samples: raw.n_samples,
+            n_features: raw.n_features,
+            feature_labels: raw.feature_labels.clone(),
+            sample_labels: raw.sample_labels.clone(),
+        }
+    }
+}
+impl From<&RawDataset> for DatasetMetadata {
+    fn from(raw: &RawDataset) -> Self {
+        Self {
+            n_samples: raw.n_samples,
+            n_features: raw.n_features,
+            feature_labels: raw.feature_labels.clone(),
+            sample_labels: raw.sample_labels.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -371,8 +401,8 @@ pub fn load_dataset(x_path: &Path, y_path: &Path) -> Result<RawDataset> {
         n_samples,
         n_features,
         row_labels,
-        x_labels,
-        y_labels,
+        feature_labels: x_labels,
+        sample_labels: y_labels,
     })
 }
 
@@ -397,7 +427,7 @@ mod tests {
             408,
             "unexpected number of descriptors"
         );
-        assert!(ds.x_labels.is_some(), "expected feature labels from header");
+        assert!(ds.feature_labels.is_some(), "expected feature labels from header");
         assert!(
             ds.row_labels.is_some(),
             "expected row labels from index column"
@@ -428,7 +458,7 @@ mod tests {
         );
         assert_eq!(ds.x.nrows(), 49, "unexpected row count in x");
         assert_eq!(ds.x.ncols(), 12260, "unexpected column count in x");
-        assert!(ds.x_labels.is_some(), "expected feature labels from header");
+        assert!(ds.feature_labels.is_some(), "expected feature labels from header");
         assert!(ds.row_labels.is_some(), "expected row labels from index column");
         assert_eq!(ds.frame.height(), 49, "unexpected frame height");
         assert_eq!(ds.frame.width(), 12260, "unexpected frame width");

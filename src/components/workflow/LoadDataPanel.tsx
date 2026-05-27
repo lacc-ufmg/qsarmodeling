@@ -2,14 +2,14 @@ import { Box, Button, Group, Stack, Text } from "@mantine/core";
 import { IconDatabase, IconUpload, IconLayoutRows, IconLayoutColumns, IconX } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
-import type { DatasetProfile } from "../../lib/mockQsarBackend";
+import type { DatasetMetadata } from "../../generated";
 import { TooltipLabel } from "../ui/HelpTooltip";
 import { StatsRing } from "../ui/StatsRing";
 
 type LoadDataPanelProps = {
   matrixFilePath: string | null;
   vectorFilePath: string | null;
-  uploadedDataset: DatasetProfile | null;
+  uploadedDataset: DatasetMetadata | null;
   isLoading: boolean;
   isDisabled: boolean;
   onSelectMatrixFile: () => void;
@@ -127,15 +127,15 @@ export function LoadDataPanel ({
           <StatsRing stats={[
             {
               label: "Samples",
-              stats: uploadedDataset.rows.toString(),
-              progress: (uploadedDataset.rows / (uploadedDataset.rows + uploadedDataset.descriptors)) * 100,
+              stats: uploadedDataset.n_samples.toString(),
+              progress: (uploadedDataset.n_samples / (uploadedDataset.n_samples + uploadedDataset.n_features)) * 100,
               color: "blue",
               icon: <IconLayoutRows />,
             },
             {
               label: "Descriptors",
-              stats: uploadedDataset.descriptors.toString(),
-              progress: (uploadedDataset.descriptors / (uploadedDataset.rows + uploadedDataset.descriptors)) * 100,
+              stats: uploadedDataset.n_features.toString(),
+              progress: (uploadedDataset.n_features / (uploadedDataset.n_samples + uploadedDataset.n_features)) * 100,
               color: "teal",
               icon: <IconLayoutColumns />,
             },
