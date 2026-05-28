@@ -17,10 +17,10 @@ jobs:
         with:
           cache-on-failure: true
 
-      # - name: install dependencies (ubuntu only)
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: install dependencies (ubuntu only)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Run tests
         run: cargo test
