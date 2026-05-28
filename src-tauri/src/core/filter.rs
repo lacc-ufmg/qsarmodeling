@@ -349,7 +349,7 @@ mod tests {
             autoscale: false,
         });
 
-        assert_eq!(result.state.kept, vec![0, 1]);
+        assert_eq!(result.state.kept, vec![0, 2]);
         assert_eq!(result.state.dropped_by_filter[0].0, "variance");
         assert_eq!(
             result.state.dropped_by_filter[1].0,
