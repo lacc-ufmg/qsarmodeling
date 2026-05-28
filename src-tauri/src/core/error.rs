@@ -1,4 +1,3 @@
-use polars::prelude::PolarsError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -7,8 +6,6 @@ pub enum QsarError {
     Io(#[from] std::io::Error),
     #[error("CSV error: {0}")]
     Csv(#[from] csv::Error),
-    #[error("Polars error: {0}")]
-    Polars(#[from] PolarsError),
     #[error("Unknown session: {0}")]
     MissingSession(String),
     #[error("Invalid dataset: {0}")]

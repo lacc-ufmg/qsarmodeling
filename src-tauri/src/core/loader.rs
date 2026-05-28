@@ -16,7 +16,7 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 use csv::ReaderBuilder;
 use ndarray::{Array1, Array2, ShapeBuilder};
-use polars::prelude::*;
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -26,8 +26,6 @@ pub struct RawDataset {
     pub x: Array2<f64>,
     /// Activity vector [n_samples].
     pub y: Array1<f64>,
-    /// Compatibility view of `x` for the existing DataFrame-based code paths.
-    pub frame: DataFrame,
     pub n_samples: usize,
     pub n_features: usize,
     /// Row labels from the X index column, if present.
@@ -222,30 +220,15 @@ fn csv_reader(path: &Path, delimiter: u8, has_headers: bool) -> Result<csv::Read
         .from_reader(file))
 }
 
-fn build_frame_from_x(x: &Array2<f64>, x_labels: Option<&[String]>) -> Result<DataFrame> {
-    let nrows = x.nrows();
-    let ncols = x.ncols();
-    let data = x
-        .as_slice_memory_order()
-        .context("x is expected to be contiguous in column-major order")?;
-
-    let mut columns: Vec<Column> = Vec::with_capacity(ncols);
-    for col in 0..ncols {
-        let start = col * nrows;
-        let end = start + nrows;
-        let name = x_labels
-            .and_then(|labels| labels.get(col).cloned())
-            .unwrap_or_else(|| format!("x{}", col + 1));
-        columns.push(Series::new(name.into(), data[start..end].to_vec()).into_column());
-    }
-
-    Ok(DataFrame::new(nrows, columns)?)
-}
+// Previously we exposed a `DataFrame` view of `x` using `polars`.
+// That compatibility view has been removed to avoid the heavy `polars`
+// dependency; callers should construct any tabular view themselves if
+// needed.
 
 fn load_x(
     path: &Path,
     meta: CsvMeta,
-) -> Result<(Array2<f64>, DataFrame, Option<Vec<String>>, Option<Vec<String>>)> {
+) -> Result<(Array2<f64>, Option<Vec<String>>, Option<Vec<String>>)> {
     let mut rdr = csv_reader(path, meta.delimiter, meta.has_header)?;
 
     let x_labels = if meta.has_header {
@@ -314,8 +297,7 @@ fn load_x(
 
     let x = Array2::from_shape_vec((nrows, ncols).f(), data)
         .context("failed to build Array2 from column-major buffer")?;
-    let frame = build_frame_from_x(&x, x_labels.as_deref())?;
-    Ok((x, frame, x_labels, if meta.has_index { Some(row_labels) } else { None }))
+    Ok((x, x_labels, if meta.has_index { Some(row_labels) } else { None }))
 }
 
 /// Load y.csv as a 1-D vector.
@@ -377,7 +359,7 @@ fn load_y(path: &Path) -> Result<(Array1<f64>, Option<Vec<String>>)> {
 pub fn load_dataset(x_path: &Path, y_path: &Path) -> Result<RawDataset> {
     let x_meta = detect_meta(x_path).context("sniffing X.csv")?;
 
-    let (x, frame, x_labels, row_labels_x) = load_x(x_path, x_meta).context("loading X.csv")?;
+    let (x, x_labels, row_labels_x) = load_x(x_path, x_meta).context("loading X.csv")?;
     let (y, y_labels_y) = load_y(y_path).context("loading y.csv")?;
 
     let n_samples = x.nrows();
@@ -397,7 +379,6 @@ pub fn load_dataset(x_path: &Path, y_path: &Path) -> Result<RawDataset> {
     Ok(RawDataset {
         x,
         y,
-        frame,
         n_samples,
         n_features,
         row_labels,
@@ -433,8 +414,8 @@ mod tests {
             "expected row labels from index column"
         );
         assert!(!ds.x.is_standard_layout(), "expected column-major x layout");
-        assert_eq!(ds.frame.height(), ds.n_samples, "unexpected frame height");
-        assert_eq!(ds.frame.width(), ds.n_features, "unexpected frame width");
+        assert_eq!(ds.x.nrows(), ds.n_samples, "unexpected frame height");
+        assert_eq!(ds.x.ncols(), ds.n_features, "unexpected frame width");
 
         // y should have 37 entries
         assert_eq!(ds.y.len(), ds.n_samples, "unexpected target vector length");
@@ -460,8 +441,8 @@ mod tests {
         assert_eq!(ds.x.ncols(), 12260, "unexpected column count in x");
         assert!(ds.feature_labels.is_some(), "expected feature labels from header");
         assert!(ds.row_labels.is_some(), "expected row labels from index column");
-        assert_eq!(ds.frame.height(), 49, "unexpected frame height");
-        assert_eq!(ds.frame.width(), 12260, "unexpected frame width");
+        assert_eq!(ds.x.nrows(), 49, "unexpected frame height");
+        assert_eq!(ds.x.ncols(), 12260, "unexpected frame width");
 
         assert_eq!(ds.y.len(), 49, "unexpected target vector length");
     }
@@ -485,8 +466,8 @@ mod tests {
         assert_eq!(ds.x.ncols(), 34820, "unexpected column count in x");
         assert!(!ds.x.is_standard_layout(), "expected column-major x layout");
         assert!(ds.row_labels.is_some(), "expected row labels from index column");
-        assert_eq!(ds.frame.height(), 49, "unexpected frame height");
-        assert_eq!(ds.frame.width(), 34820, "unexpected frame width");
+        assert_eq!(ds.x.nrows(), 49, "unexpected frame height");
+        assert_eq!(ds.x.ncols(), 34820, "unexpected frame width");
     }
 
     #[test]

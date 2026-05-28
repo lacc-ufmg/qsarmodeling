@@ -292,7 +292,6 @@ mod tests {
     use super::*;
     use ndarray::array;
     use ndarray::{Array1, Array2};
-    use polars::prelude::DataFrame;
     use std::sync::Arc;
 
     fn test_dataset(x: Array2<f64>, y: ndarray::Array1<f64>) -> Arc<RawDataset> {
@@ -302,7 +301,6 @@ mod tests {
         Arc::new(RawDataset {
             x,
             y,
-            frame: DataFrame::default(),
             n_samples,
             n_features,
             row_labels: None,
@@ -382,7 +380,6 @@ mod tests {
         Arc::new(RawDataset {
             y: Array1::from_vec(y_vals.to_vec()),
             x,
-            frame: DataFrame::default(), // unused by filter paths
             n_samples,
             n_features,
             row_labels: None,
