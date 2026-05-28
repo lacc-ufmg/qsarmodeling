@@ -29,7 +29,7 @@ build
 dist
 dist-ssr
 *.local
-src/generated/
+src/generated/.typecache
 
 # Misc
 .DS_Store
