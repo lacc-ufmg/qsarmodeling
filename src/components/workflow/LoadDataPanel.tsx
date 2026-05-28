@@ -1,8 +1,9 @@
-import { Box, Button, Group, Stack, Text } from "@mantine/core";
-import { IconDatabase, IconUpload, IconLayoutRows, IconLayoutColumns, IconX } from "@tabler/icons-react";
+import { Box, Button, Group, Stack, Text, Menu } from "@mantine/core";
+import { IconDatabase, IconUpload, IconLayoutRows, IconLayoutColumns, IconX, IconChevronDown } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import type { DatasetMetadata } from "../../generated";
+import { ExampleDataset } from "../../generated";
 import { TooltipLabel } from "../ui/HelpTooltip";
 import { StatsRing } from "../ui/StatsRing";
 
@@ -17,6 +18,7 @@ type LoadDataPanelProps = {
   onClearMatrixFile: () => void;
   onClearVectorFile: () => void;
   onLoad: () => void;
+  onLoadExample?: (name: ExampleDataset) => void;
 };
 
 function getFileName(filePath: string): string {
@@ -34,6 +36,7 @@ export function LoadDataPanel ({
   onClearMatrixFile,
   onClearVectorFile,
   onLoad,
+  onLoadExample,
 }: LoadDataPanelProps) {
   return (
     <StepCard
@@ -111,14 +114,35 @@ export function LoadDataPanel ({
           </Stack>
         </Group>
         <Box>
-          <Button
-            onClick={onLoad}
-            disabled={isDisabled || !matrixFilePath || !vectorFilePath}
-            loading={isLoading}
-            leftSection={<IconDatabase size="1rem" />}
-          >
-            Load dataset
-          </Button>
+          <Group>
+            <Button
+              onClick={onLoad}
+              disabled={isDisabled || !matrixFilePath || !vectorFilePath}
+              loading={isLoading}
+              leftSection={<IconDatabase size="1rem" />}
+            >
+              Load dataset
+            </Button>
+
+            <Menu withinPortal position="bottom-end">
+              <Menu.Target>
+                <Button rightSection={<IconChevronDown size="1rem" />} variant="outline">
+                  Examples
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={() => onLoadExample?.("Dream")}>
+                  Dream
+                </Menu.Item>
+                <Menu.Item onClick={() => onLoadExample?.("Carbox")}>
+                  Carbox
+                </Menu.Item>
+                <Menu.Item onClick={() => onLoadExample?.("CarboxBig")}>
+                  Carbox (big)
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
         </Box>
       </Stack>
 

@@ -40,6 +40,9 @@
       "deb",
       "nsis"
     ],
+    "resources": [
+      "examples/data/"
+    ],
     "category": "Utility",
     "shortDescription": "Quantitative Structure–Activity Relationship modelling",
     "longDescription": "QSAR Modeling allows researchers to build, evaluate and apply QSAR/QSPR models for molecular property prediction. All data stays local.",

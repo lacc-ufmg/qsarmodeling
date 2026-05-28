@@ -84,12 +84,13 @@ export default function App () {
               vectorFilePath={state.vectorFilePath}
               uploadedDataset={state.uploadedDataset}
               isLoading={state.busyState === "loading-data"}
-              isDisabled={!selectors.canLoadData}
+              isDisabled={!selectors.canLoadData && !state.uploadedDataset}
               onSelectMatrixFile={actions.selectMatrixFile}
               onSelectVectorFile={actions.selectVectorFile}
               onClearMatrixFile={actions.clearMatrixFile}
               onClearVectorFile={actions.clearVectorFile}
               onLoad={actions.loadData}
+              onLoadExample={actions.loadExampleDataset}
             />
 
             {/* Step 2: Filter Descriptors */}

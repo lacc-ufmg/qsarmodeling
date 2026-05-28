@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { DatasetMetadata, FilterConfig, OpsResult, OpsConfig } from "../generated";
-import { applyFilterCmd, loadDatasetCmd, runSelectionCmd } from "../generated";
+import type { DatasetMetadata, FilterConfig, OpsResult, OpsConfig, ExampleDataset } from "../generated";
+import { applyFilterCmd, loadDatasetCmd, runSelectionCmd, loadExampleDatasetCmd } from "../generated";
 
 type WorkflowState = {
   matrixFilePath: string | null;
@@ -97,6 +97,26 @@ export function useQsarWorkflow() {
     }
   }, [matrixFilePath, vectorFilePath]);
 
+  const loadExampleDataset = useCallback(async (name: ExampleDataset) => {
+    try {
+      setBusyState("loading-data");
+
+      const meta = await loadExampleDatasetCmd({dataset: name});
+
+      // setMatrixFilePath(name);
+      // setVectorFilePath(name);
+      setUploadedDataset(meta);
+      setActiveDataset(meta);
+      setIsFiltered(false);
+      setSelectionResult(null);
+      setError(null);
+    } catch (err) {
+      setError(toErrorMessage(err, "Failed to load example dataset."));
+    } finally {
+      setBusyState("idle");
+    }
+  }, []);
+
   const runDescriptorFilters = useCallback(async () => {
     if (!uploadedDataset) return;
 
@@ -180,6 +200,7 @@ export function useQsarWorkflow() {
       updateFilterSettings,
       updateSelectionSettings,
       loadData,
+      loadExampleDataset,
       runDescriptorFilters,
       runVariableSelection,
     },

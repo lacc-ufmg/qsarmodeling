@@ -32,6 +32,7 @@ pub fn run() {
             core::commands::run_selection_cmd,
             core::commands::has_dataset_cmd,
             core::commands::get_last_filter_result_cmd,
+            core::commands::load_example_dataset_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
