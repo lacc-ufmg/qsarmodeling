@@ -13,7 +13,11 @@ pub enum QsarError {
     #[error("Filtering removed every descriptor.")]
     EmptyFilterResult,
     #[error("Non-numeric value in column '{column}' at row {row}: {value}")]
-    NonNumericValue { column: String, row: usize, value: String },
+    NonNumericValue {
+        column: String,
+        row: usize,
+        value: String,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, QsarError>;

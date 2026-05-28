@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use super::loader::DatasetMetadata;
-use super::ops::{OpsResult, OpsConfig};
+use super::ops::{OpsConfig, OpsResult};
 
 use super::filter::{FilterConfig, FilterPipeline, FilterResult};
 use super::loader::RawDataset;

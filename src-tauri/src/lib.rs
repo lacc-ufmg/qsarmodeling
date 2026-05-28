@@ -4,7 +4,6 @@ pub mod validation;
 
 use serde::Serialize;
 
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AppInfo {

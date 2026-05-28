@@ -1,6 +1,6 @@
-use ndarray::{Array1, Array2};
 use crate::utils::stats;
-use crate::validation::{loo_q2_rmsecv, YRandomizationResult, CVConfig};
+use crate::validation::{loo_q2_rmsecv, CVConfig, YRandomizationResult};
+use ndarray::{Array1, Array2};
 use rand::SeedableRng;
 
 /// Compute Y-Randomization validation
@@ -15,7 +15,11 @@ use rand::SeedableRng;
 ///
 /// # Returns
 /// YRandomizationResult with regression intercepts/slopes and validation metrics
-pub fn yrand_validation(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> YRandomizationResult {
+pub fn yrand_validation(
+    x: &Array2<f64>,
+    y: &Array1<f64>,
+    config: &CVConfig,
+) -> YRandomizationResult {
     let n = x.nrows();
     let n_lv_max = config.n_lv_max.min(n - 1);
     let n_randomizations = config.n_folds; // Repurpose n_folds as n_randomizations
@@ -23,7 +27,7 @@ pub fn yrand_validation(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> 
     // Initialize RNG
     let mut rng = match config.seed {
         Some(seed) => rand::rngs::StdRng::seed_from_u64(seed),
-        None => rand::rngs::StdRng::seed_from_u64(rand::random())
+        None => rand::rngs::StdRng::seed_from_u64(rand::random()),
     };
 
     // Storage for metrics from randomized and original runs
@@ -45,7 +49,12 @@ pub fn yrand_validation(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> 
 
         // Calculate correlation R between original y (scaled) and shuffled y (scaled)
         let shuffled_mean = y_shuffled.iter().copied().sum::<f64>() / n as f64;
-        let shuffled_std = (y_shuffled.iter().map(|&v| (v - shuffled_mean).powi(2)).sum::<f64>() / n as f64).sqrt();
+        let shuffled_std = (y_shuffled
+            .iter()
+            .map(|&v| (v - shuffled_mean).powi(2))
+            .sum::<f64>()
+            / n as f64)
+            .sqrt();
 
         let r_corr = if y_std > 1e-14 && shuffled_std > 1e-14 {
             let mut cov = 0.0;
@@ -111,11 +120,8 @@ mod tests {
 
     #[test]
     fn yrand_validation_basic() {
-        let x = Array2::from_shape_vec(
-            (20, 2),
-            (1..=40).map(|i| i as f64 / 10.0).collect(),
-        )
-        .unwrap();
+        let x =
+            Array2::from_shape_vec((20, 2), (1..=40).map(|i| i as f64 / 10.0).collect()).unwrap();
         let y = Array1::from_vec((1..=20).map(|i| i as f64).collect());
 
         let config = CVConfig {
@@ -142,10 +148,14 @@ mod tests {
     fn yrand_validation_r_values_in_range() {
         let x = Array2::from_shape_vec(
             (15, 1),
-            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0],
+            vec![
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+            ],
         )
         .unwrap();
-        let y = Array1::from_vec(vec![2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0]);
+        let y = Array1::from_vec(vec![
+            2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0,
+        ]);
 
         let config = CVConfig {
             n_lv_max: 1,
@@ -159,7 +169,11 @@ mod tests {
         // R values should be in [-1, 1] except the last one which is 1.0 (correlation with self)
         for (i, &r) in result.r_values.iter().enumerate() {
             if i == result.r_values.len() - 1 {
-                assert!(((r - 1.0).abs() < 1e-10), "Final R should be 1.0, got {}", r);
+                assert!(
+                    ((r - 1.0).abs() < 1e-10),
+                    "Final R should be 1.0, got {}",
+                    r
+                );
             } else {
                 assert!(r >= -1.0 && r <= 1.0, "R value out of range: {}", r);
             }

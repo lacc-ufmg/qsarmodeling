@@ -361,7 +361,6 @@ mod tests {
         );
     }
 
-
     /// Build a minimal `RawDataset` from column slices and a target slice.
     /// `cols[j]` is the j-th feature column; `y_vals` is the target vector.
     fn dataset_from_cols(cols: &[&[f64]], y_vals: &[f64]) -> Arc<RawDataset> {

@@ -1,7 +1,7 @@
-use ndarray::{Array1, Array2, s};
 use crate::core::pls;
 use crate::utils::stats;
-use crate::validation::{validation_metrics, CVResult, CVConfig};
+use crate::validation::{validation_metrics, CVConfig, CVResult};
+use ndarray::{s, Array1, Array2};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
@@ -24,7 +24,7 @@ pub fn kfold_cv(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig, shuffle: bo
     // Initialize RNG with optional seed
     let mut rng = match config.seed {
         Some(seed) => rand::rngs::StdRng::seed_from_u64(seed),
-        None => rand::rngs::StdRng::seed_from_u64(rand::random())
+        None => rand::rngs::StdRng::seed_from_u64(rand::random()),
     };
 
     // Create fold indices
@@ -156,8 +156,8 @@ mod tests {
         let x = Array2::from_shape_vec(
             (10, 2),
             vec![
-                1.0, 0.5, 2.0, 1.0, 3.0, 1.5, 4.0, 2.0, 5.0, 2.5,
-                6.0, 3.0, 7.0, 3.5, 8.0, 4.0, 9.0, 4.5, 10.0, 5.0,
+                1.0, 0.5, 2.0, 1.0, 3.0, 1.5, 4.0, 2.0, 5.0, 2.5, 6.0, 3.0, 7.0, 3.5, 8.0, 4.0,
+                9.0, 4.5, 10.0, 5.0,
             ],
         )
         .unwrap();
@@ -180,11 +180,8 @@ mod tests {
 
     #[test]
     fn kfold_cv_5fold_all_metrics() {
-        let x = Array2::from_shape_vec(
-            (50, 3),
-            (1..=150).map(|i| i as f64 / 10.0).collect(),
-        )
-        .unwrap();
+        let x =
+            Array2::from_shape_vec((50, 3), (1..=150).map(|i| i as f64 / 10.0).collect()).unwrap();
         let y = Array1::from_vec((1..=50).map(|i| i as f64).collect());
 
         let config = CVConfig {

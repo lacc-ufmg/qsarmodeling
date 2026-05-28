@@ -1,7 +1,7 @@
-use ndarray::{Array1, Array2};
 use crate::core::pls;
 use crate::utils::stats;
-use crate::validation::{validation_metrics, CVResult, CVConfig};
+use crate::validation::{validation_metrics, CVConfig, CVResult};
+use ndarray::{Array1, Array2};
 
 /// Compute Leave-One-Out Cross-Validation with comprehensive metrics
 ///
@@ -18,8 +18,8 @@ pub fn loo_cv(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> CVResult {
     let n_lv_max = config.n_lv_max.min(n - 1);
 
     // Pre-allocate matrices for CV and calibration predictions
-    let mut ycv = Array2::<f64>::zeros((n, n_lv_max));   // CV predictions: n × n_lv_max
-    let mut ycal = Array2::<f64>::zeros((n, n_lv_max));  // Calibration predictions: n × n_lv_max
+    let mut ycv = Array2::<f64>::zeros((n, n_lv_max)); // CV predictions: n × n_lv_max
+    let mut ycal = Array2::<f64>::zeros((n, n_lv_max)); // Calibration predictions: n × n_lv_max
 
     // Pre-allocate buffers for training data (reused in each fold)
     let mut x_tr = Array2::<f64>::zeros((n - 1, p));
@@ -113,11 +113,7 @@ mod tests {
     // training points → each held-out prediction is exact → Q² = 1 and RMSECV = 0.
     #[test]
     fn loo_q2_rmsecv_zero_for_perfectly_linear_data() {
-        let x = Array2::from_shape_vec(
-            (6, 1),
-            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-        )
-        .unwrap();
+        let x = Array2::from_shape_vec((6, 1), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
         let y = Array1::from_vec(vec![2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
 
         let (q2, rmsecv) = crate::validation::loo_q2_rmsecv(&x, &y, 1);
@@ -130,13 +126,7 @@ mod tests {
     fn loo_q2_rmsecv_is_finite_and_non_negative() {
         let x = Array2::from_shape_vec(
             (5, 2),
-            vec![
-                1.0, 0.0,
-                2.0, 1.0,
-                3.0,-1.0,
-                4.0, 0.5,
-                5.0,-0.5,
-            ],
+            vec![1.0, 0.0, 2.0, 1.0, 3.0, -1.0, 4.0, 0.5, 5.0, -0.5],
         )
         .unwrap();
         let y = Array1::from_vec(vec![1.0, 3.0, 2.0, 4.0, 2.5]);
@@ -150,11 +140,7 @@ mod tests {
     // Test new comprehensive LOO_CV function
     #[test]
     fn loo_cv_perfect_linear_all_metrics() {
-        let x = Array2::from_shape_vec(
-            (6, 1),
-            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-        )
-        .unwrap();
+        let x = Array2::from_shape_vec((6, 1), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
         let y = Array1::from_vec(vec![2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
 
         let config = CVConfig {
@@ -184,16 +170,8 @@ mod tests {
         let x = Array2::from_shape_vec(
             (10, 3),
             vec![
-                1.0, 0.5, 0.1,
-                2.0, 1.0, 0.2,
-                3.0, 1.5, 0.3,
-                4.0, 2.0, 0.4,
-                5.0, 2.5, 0.5,
-                6.0, 3.0, 0.6,
-                7.0, 3.5, 0.7,
-                8.0, 4.0, 0.8,
-                9.0, 4.5, 0.9,
-                10.0, 5.0, 1.0,
+                1.0, 0.5, 0.1, 2.0, 1.0, 0.2, 3.0, 1.5, 0.3, 4.0, 2.0, 0.4, 5.0, 2.5, 0.5, 6.0,
+                3.0, 0.6, 7.0, 3.5, 0.7, 8.0, 4.0, 0.8, 9.0, 4.5, 0.9, 10.0, 5.0, 1.0,
             ],
         )
         .unwrap();

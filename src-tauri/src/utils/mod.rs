@@ -1,5 +1,5 @@
 pub mod stats;
-use ndarray::{Array2, s};
+use ndarray::{s, Array2};
 
 pub fn select_columns(x: &Array2<f64>, cols: &[usize]) -> Array2<f64> {
     let n = x.nrows();
@@ -36,8 +36,8 @@ pub fn mat_inv_gauss(a: Array2<f64>) -> Option<Array2<f64>> {
 
         if pivot_row != col {
             for j in 0..2 * n {
-                let tmp            = aug[[col, j]];
-                aug[[col, j]]      = aug[[pivot_row, j]];
+                let tmp = aug[[col, j]];
+                aug[[col, j]] = aug[[pivot_row, j]];
                 aug[[pivot_row, j]] = tmp;
             }
         }
@@ -73,7 +73,7 @@ pub fn mat_inv_gauss(a: Array2<f64>) -> Option<Array2<f64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::{Array2};
+    use ndarray::Array2;
 
     const EPS: f64 = 1e-9;
 
@@ -104,20 +104,17 @@ mod tests {
         // [[3, 1], [2, 4]]  →  1/10 · [[4, -1], [-2, 3]]
         let a = Array2::from_shape_vec((2, 2), vec![3.0, 1.0, 2.0, 4.0]).unwrap();
         let inv = mat_inv_gauss(a).unwrap();
-        assert!((inv[[0, 0]] -  0.4).abs() < EPS);
+        assert!((inv[[0, 0]] - 0.4).abs() < EPS);
         assert!((inv[[0, 1]] - -0.1).abs() < EPS);
         assert!((inv[[1, 0]] - -0.2).abs() < EPS);
-        assert!((inv[[1, 1]] -  0.3).abs() < EPS);
+        assert!((inv[[1, 1]] - 0.3).abs() < EPS);
     }
 
     #[test]
     fn mat_inv_product_with_original_is_identity() {
         // 3 × 3 non-trivial dense matrix
-        let a = Array2::from_shape_vec(
-            (3, 3),
-            vec![1.0, 2.0, 0.0, 3.0, 4.0, 1.0, 0.0, 1.0, 2.0],
-        )
-        .unwrap();
+        let a = Array2::from_shape_vec((3, 3), vec![1.0, 2.0, 0.0, 3.0, 4.0, 1.0, 0.0, 1.0, 2.0])
+            .unwrap();
         let inv = mat_inv_gauss(a.clone()).unwrap();
         let prod = a.dot(&inv);
 

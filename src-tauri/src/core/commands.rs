@@ -1,9 +1,9 @@
+use serde::{Deserialize, Serialize};
 use std::path::Path;
-use serde::{Serialize, Deserialize};
 
-use tauri::State;
-use tauri::Manager;
 use tauri::path::BaseDirectory;
+use tauri::Manager;
+use tauri::State;
 
 use super::loader::DatasetMetadata;
 use super::ops::{OpsConfig, OpsResult};
@@ -42,9 +42,7 @@ pub fn has_dataset_cmd(state: State<SessionState>) -> bool {
 }
 
 #[tauri::command]
-pub fn get_last_filter_result_cmd(
-    state: State<SessionState>,
-) -> Option<FilterResult> {
+pub fn get_last_filter_result_cmd(state: State<SessionState>) -> Option<FilterResult> {
     state.get_last_result()
 }
 
@@ -64,9 +62,18 @@ pub async fn load_example_dataset_cmd(
     let (x_path_rel, y_path_rel) = match dataset {
         ExampleDataset::Dream => ("examples/data/dream/X.csv", "examples/data/dream/y.csv"),
         ExampleDataset::Carbox => ("examples/data/carbox/X.csv", "examples/data/carbox/y.csv"),
-        ExampleDataset::CarboxBig => ("examples/data/carbox/X_big.csv", "examples/data/carbox/y.csv"),
+        ExampleDataset::CarboxBig => (
+            "examples/data/carbox/X_big.csv",
+            "examples/data/carbox/y.csv",
+        ),
     };
-    let x_path = handle.path().resolve(x_path_rel, BaseDirectory::Resource).expect("Fail to load X path");
-    let y_path = handle.path().resolve(y_path_rel, BaseDirectory::Resource).expect("Fail to load Y path");
+    let x_path = handle
+        .path()
+        .resolve(x_path_rel, BaseDirectory::Resource)
+        .expect("Fail to load X path");
+    let y_path = handle
+        .path()
+        .resolve(y_path_rel, BaseDirectory::Resource)
+        .expect("Fail to load Y path");
     state.load_dataset(x_path.as_path(), y_path.as_path())
 }

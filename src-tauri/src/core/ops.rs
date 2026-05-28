@@ -12,11 +12,11 @@
 //! [`OpsConfig::latent_vars_model`] PLS components.  Return the sub-model
 //! with the lowest RMSECV.
 
-use ndarray::{Array1, Array2};
-use serde::{Deserialize, Serialize};
 use super::pls;
 use crate::utils::*;
 use crate::validation::metrics::loo_q2_rmsecv;
+use ndarray::{Array1, Array2};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -78,9 +78,9 @@ pub fn run_ops(x: &Array2<f64>, y: &Array1<f64>, config: &OpsConfig) -> OpsResul
     });
 
     // ── Phase 2: candidate sub-model loop ────────────────────────────────────
-    let lv_m  = config.latent_vars_model;
+    let lv_m = config.latent_vars_model;
     let min_k = config.min_vars_model.max(lv_m).min(p);
-    let step  = ((p as f64 * config.vars_percentage).ceil() as usize).max(1);
+    let step = ((p as f64 * config.vars_percentage).ceil() as usize).max(1);
 
     let mut trace: Vec<(usize, f64)> = Vec::new();
     let mut best_rmsecv = f64::INFINITY;
@@ -114,7 +114,6 @@ pub fn run_ops(x: &Array2<f64>, y: &Array1<f64>, config: &OpsConfig) -> OpsResul
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,12 +127,7 @@ mod tests {
     fn ops_test_dataset() -> (Array2<f64>, Array1<f64>) {
         let x = Array2::from_shape_vec(
             (4, 3),
-            vec![
-                1.0,  1.0,  0.0,
-                2.0, -2.0,  1.0,
-                3.0,  1.0, -2.0,
-                4.0,  0.0,  1.0,
-            ],
+            vec![1.0, 1.0, 0.0, 2.0, -2.0, 1.0, 3.0, 1.0, -2.0, 4.0, 0.0, 1.0],
         )
         .unwrap();
         let y = Array1::from_vec(vec![1.0, 2.0, 3.0, 4.0]);
@@ -142,10 +136,10 @@ mod tests {
 
     fn ops_test_config() -> OpsConfig {
         OpsConfig {
-            latent_vars_ops:   1,
+            latent_vars_ops: 1,
             latent_vars_model: 1,
-            vars_percentage:   0.5, // step = ⌈3 × 0.5⌉ = 2
-            min_vars_model:    1,
+            vars_percentage: 0.5, // step = ⌈3 × 0.5⌉ = 2
+            min_vars_model: 1,
         }
     }
 
@@ -205,22 +199,18 @@ mod tests {
         let x = Array2::from_shape_vec(
             (6, 4),
             vec![
-                1.0, 0.5,  1.0, -1.0,
-                2.0, 1.0, -2.0,  1.0,
-                3.0, 1.5,  1.0, -1.0,
-                4.0, 2.0, -2.0,  1.0,
-                5.0, 2.5,  1.0, -1.0,
-                6.0, 3.0, -2.0,  1.0,
+                1.0, 0.5, 1.0, -1.0, 2.0, 1.0, -2.0, 1.0, 3.0, 1.5, 1.0, -1.0, 4.0, 2.0, -2.0, 1.0,
+                5.0, 2.5, 1.0, -1.0, 6.0, 3.0, -2.0, 1.0,
             ],
         )
         .unwrap();
         let y = Array1::from_vec(vec![2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
 
         let config = OpsConfig {
-            latent_vars_ops:   1,
+            latent_vars_ops: 1,
             latent_vars_model: 1,
-            vars_percentage:   0.25, // step = ⌈4 × 0.25⌉ = 1 → 4 trace entries
-            min_vars_model:    1,
+            vars_percentage: 0.25, // step = ⌈4 × 0.25⌉ = 1 → 4 trace entries
+            min_vars_model: 1,
         };
 
         let result = run_ops(&x, &y, &config);
@@ -234,7 +224,8 @@ mod tests {
         assert!(
             (result.best_rmsecv - trace_min).abs() < 1e-12,
             "best_rmsecv={:.6} but trace minimum={:.6}",
-            result.best_rmsecv, trace_min
+            result.best_rmsecv,
+            trace_min
         );
     }
 

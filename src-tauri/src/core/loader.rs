@@ -16,8 +16,8 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 use csv::ReaderBuilder;
 use ndarray::{Array1, Array2, ShapeBuilder};
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct RawDataset {
@@ -116,7 +116,11 @@ fn detect_delimiter(lines: &[String]) -> u8 {
             let n = counts.len() as f64;
             let mean = counts.iter().sum::<f64>() / n;
             let var = counts.iter().map(|&c| (c - mean).powi(2)).sum::<f64>() / n;
-            let cv = if mean > 0.0 { var.sqrt() / mean } else { f64::INFINITY };
+            let cv = if mean > 0.0 {
+                var.sqrt() / mean
+            } else {
+                f64::INFINITY
+            };
             let score = mean * (1.0 - cv.min(1.0));
             if score > best_score {
                 best_score = score;
@@ -193,7 +197,11 @@ fn detect_meta(path: &Path) -> Result<CsvMeta> {
     }
 
     let (has_header, has_index) = detect_header_and_index(&lines, delimiter);
-    Ok(CsvMeta { delimiter, has_header, has_index })
+    Ok(CsvMeta {
+        delimiter,
+        has_header,
+        has_index,
+    })
 }
 
 /// Public helper used by tests and callers that only need the CSV layout.
@@ -207,9 +215,9 @@ fn normalized_label(value: &str) -> String {
 
 fn parse_f64_cell(value: &str, file: &str, row: usize, col: usize) -> Result<f64> {
     let value = value.trim();
-    value.parse::<f64>().with_context(|| {
-        format!("{file}: cannot parse '{value}' at row {row}, column {col}")
-    })
+    value
+        .parse::<f64>()
+        .with_context(|| format!("{file}: cannot parse '{value}' at row {row}, column {col}"))
 }
 
 fn csv_reader(path: &Path, delimiter: u8, has_headers: bool) -> Result<csv::Reader<File>> {
@@ -297,7 +305,15 @@ fn load_x(
 
     let x = Array2::from_shape_vec((nrows, ncols).f(), data)
         .context("failed to build Array2 from column-major buffer")?;
-    Ok((x, x_labels, if meta.has_index { Some(row_labels) } else { None }))
+    Ok((
+        x,
+        x_labels,
+        if meta.has_index {
+            Some(row_labels)
+        } else {
+            None
+        },
+    ))
 }
 
 /// Load y.csv as a 1-D vector.
@@ -343,7 +359,10 @@ fn load_y(path: &Path) -> Result<(Array1<f64>, Option<Vec<String>>)> {
         }
     }
 
-    Ok((Array1::from_vec(values), if has_index { Some(labels) } else { None }))
+    Ok((
+        Array1::from_vec(values),
+        if has_index { Some(labels) } else { None },
+    ))
 }
 
 /// Load a [`RawDataset`] from `x_path` (descriptor matrix) and `y_path`
@@ -403,12 +422,11 @@ mod tests {
 
         // X.csv is expected to be 37 rows x 408 columns (with index column removed)
         assert_eq!(ds.n_samples, 37, "unexpected number of rows");
-        assert_eq!(
-            ds.n_features,
-            408,
-            "unexpected number of descriptors"
+        assert_eq!(ds.n_features, 408, "unexpected number of descriptors");
+        assert!(
+            ds.feature_labels.is_some(),
+            "expected feature labels from header"
         );
-        assert!(ds.feature_labels.is_some(), "expected feature labels from header");
         assert!(
             ds.row_labels.is_some(),
             "expected row labels from index column"
@@ -432,15 +450,17 @@ mod tests {
         let ds = load_dataset(&x, &y).expect("load dataset");
 
         assert_eq!(ds.n_samples, 49, "unexpected number of rows");
-        assert_eq!(
-            ds.n_features,
-            12260,
-            "unexpected number of descriptors"
-        );
+        assert_eq!(ds.n_features, 12260, "unexpected number of descriptors");
         assert_eq!(ds.x.nrows(), 49, "unexpected row count in x");
         assert_eq!(ds.x.ncols(), 12260, "unexpected column count in x");
-        assert!(ds.feature_labels.is_some(), "expected feature labels from header");
-        assert!(ds.row_labels.is_some(), "expected row labels from index column");
+        assert!(
+            ds.feature_labels.is_some(),
+            "expected feature labels from header"
+        );
+        assert!(
+            ds.row_labels.is_some(),
+            "expected row labels from index column"
+        );
         assert_eq!(ds.x.nrows(), 49, "unexpected frame height");
         assert_eq!(ds.x.ncols(), 12260, "unexpected frame width");
 
@@ -457,15 +477,14 @@ mod tests {
         let ds = load_dataset(&x, &y).expect("load dataset");
 
         assert_eq!(ds.n_samples, 49, "unexpected number of rows");
-        assert_eq!(
-            ds.n_features,
-            34820,
-            "unexpected number of descriptors"
-        );
+        assert_eq!(ds.n_features, 34820, "unexpected number of descriptors");
         assert_eq!(ds.x.nrows(), 49, "unexpected row count in x");
         assert_eq!(ds.x.ncols(), 34820, "unexpected column count in x");
         assert!(!ds.x.is_standard_layout(), "expected column-major x layout");
-        assert!(ds.row_labels.is_some(), "expected row labels from index column");
+        assert!(
+            ds.row_labels.is_some(),
+            "expected row labels from index column"
+        );
         assert_eq!(ds.x.nrows(), 49, "unexpected frame height");
         assert_eq!(ds.x.ncols(), 34820, "unexpected frame width");
     }
@@ -476,11 +495,7 @@ mod tests {
         let x = dir.path().join("wide.csv");
         let y = dir.path().join("wide_y.csv");
 
-        std::fs::write(
-            &x,
-            "id,a,b,c,d,e\nrow1,1,2,3,4,5\nrow2,6,7,8,9,10\n",
-        )
-        .expect("write X");
+        std::fs::write(&x, "id,a,b,c,d,e\nrow1,1,2,3,4,5\nrow2,6,7,8,9,10\n").expect("write X");
         std::fs::write(&y, "0.1\n0.2\n").expect("write y");
 
         let ds = load_dataset(&x, &y).expect("load dataset");

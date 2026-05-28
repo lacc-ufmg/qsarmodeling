@@ -1,8 +1,8 @@
-pub mod loo;
-pub mod lno;
 pub mod kfold;
-pub mod yrand;
+pub mod lno;
+pub mod loo;
 pub mod metrics;
+pub mod yrand;
 
 use metrics::*;
 use serde::{Deserialize, Serialize};

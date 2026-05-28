@@ -1,5 +1,4 @@
-use ndarray::{Array1};
-
+use ndarray::Array1;
 
 #[inline]
 pub fn min_max(y: &Array1<f64>) -> (f64, f64) {
@@ -7,8 +6,12 @@ pub fn min_max(y: &Array1<f64>) -> (f64, f64) {
     let mut max = f64::NEG_INFINITY;
 
     for &v in y {
-        if v < min { min = v; }
-        if v > max { max = v; }
+        if v < min {
+            min = v;
+        }
+        if v > max {
+            max = v;
+        }
     }
 
     (min, max)
@@ -38,8 +41,16 @@ pub fn rm2_metrics(y: &Array1<f64>, yhat: &Array1<f64>, min: f64, max: f64) -> (
         sum_y2 += sy * sy;
     }
 
-    let k = if sum_yhat2 != 0.0 { sum_y_yhat / sum_yhat2 } else { 0.0 };
-    let k1 = if sum_y2 != 0.0 { sum_y_yhat / sum_y2 } else { 0.0 };
+    let k = if sum_yhat2 != 0.0 {
+        sum_y_yhat / sum_yhat2
+    } else {
+        0.0
+    };
+    let k1 = if sum_y2 != 0.0 {
+        sum_y_yhat / sum_y2
+    } else {
+        0.0
+    };
 
     // Second pass: R² variants
     let mut ss_res_0 = 0.0;
@@ -71,8 +82,16 @@ pub fn rm2_metrics(y: &Array1<f64>, yhat: &Array1<f64>, min: f64, max: f64) -> (
         ss_tot_yhat += dp_mean * dp_mean;
     }
 
-    let r02 = if ss_tot_y != 0.0 { 1.0 - ss_res_0 / ss_tot_y } else { 0.0 };
-    let r102 = if ss_tot_yhat != 0.0 { 1.0 - ss_res_1 / ss_tot_yhat } else { 0.0 };
+    let r02 = if ss_tot_y != 0.0 {
+        1.0 - ss_res_0 / ss_tot_y
+    } else {
+        0.0
+    };
+    let r102 = if ss_tot_yhat != 0.0 {
+        1.0 - ss_res_1 / ss_tot_yhat
+    } else {
+        0.0
+    };
 
     let r = pearson_r(y, yhat);
     let r2 = r * r;
@@ -107,7 +126,8 @@ pub fn ssy(y: &Array1<f64>, mean_y: Option<f64>) -> f64 {
 pub fn press(yreal: &Array1<f64>, ypred: &Array1<f64>) -> f64 {
     debug_assert_eq!(yreal.len(), ypred.len());
 
-    yreal.iter()
+    yreal
+        .iter()
         .zip(ypred.iter())
         .map(|(&yr, &yp)| {
             let d = yr - yp;
@@ -134,7 +154,8 @@ pub fn mae(yreal: &Array1<f64>, ypred: &Array1<f64>) -> f64 {
 
     let n = yreal.len() as f64;
 
-    yreal.iter()
+    yreal
+        .iter()
         .zip(ypred.iter())
         .map(|(&yr, &yp)| (yr - yp).abs())
         .sum::<f64>()

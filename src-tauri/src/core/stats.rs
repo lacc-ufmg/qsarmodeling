@@ -1,6 +1,6 @@
+use crate::utils::stats::*;
 use ndarray::{Array1, Array2};
 use serde::{Deserialize, Serialize};
-use crate::utils::stats::*;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Stats {
@@ -87,8 +87,7 @@ pub fn calc_stats(
 
     // F-statistic
     let f_value = if r2_cal < 1.0 && selected_lv > 0 {
-        ((n - selected_lv - 1) as f64 * r2_cal)
-            / (selected_lv as f64 * (1.0 - r2_cal))
+        ((n - selected_lv - 1) as f64 * r2_cal) / (selected_lv as f64 * (1.0 - r2_cal))
     } else {
         0.0
     };
@@ -111,11 +110,7 @@ pub fn calc_stats(
     }
 }
 
-pub fn compute_all_lv_stats(
-    y: &Array1<f64>,
-    ycal: &Array2<f64>,
-    ycv: &Array2<f64>,
-) -> MultiStats {
+pub fn compute_all_lv_stats(y: &Array1<f64>, ycal: &Array2<f64>, ycv: &Array2<f64>) -> MultiStats {
     let n = y.len();
     let k = ycal.ncols();
 

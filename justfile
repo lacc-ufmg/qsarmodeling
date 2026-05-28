@@ -6,16 +6,29 @@ dev:
     pnpm run dev
 alias tauridev := dev
 alias td := dev
+alias d := dev
 
+
+check:
+    cargo check
+alias c := check
 
 test:
     cargo test
 alias t := test
 
+fmt:
+    cargo fmt
+alias f := fmt
+
 build:
     pnpm run build
 alias b := build
 
+typegen:
+    cargo tauri-typegen generate
+alias gen := typegen
+alias g := typegen
 
 vitedev:
     pnpm vite

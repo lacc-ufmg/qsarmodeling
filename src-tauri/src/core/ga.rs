@@ -156,12 +156,8 @@ impl Fitness for VariableSelectionFitness {
             }
         }
 
-        let (_raw_cv_score, penalized_score) = subset_score(
-            self.x.as_ref(),
-            self.y.as_ref(),
-            &selected,
-            &self.config,
-        )?;
+        let (_raw_cv_score, penalized_score) =
+            subset_score(self.x.as_ref(), self.y.as_ref(), &selected, &self.config)?;
 
         if !penalized_score.is_finite() {
             return None;
@@ -189,11 +185,17 @@ pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
     assert!(x.nrows() > 1, "x must have at least two samples");
     assert!(config.population_size > 0, "population_size must be > 0");
     assert!(config.max_generations > 0, "max_generations must be > 0");
-    assert!(config.max_stale_generations > 0, "max_stale_generations must be > 0");
+    assert!(
+        config.max_stale_generations > 0,
+        "max_stale_generations must be > 0"
+    );
     assert!(config.cv_folds >= 2, "cv_folds must be >= 2");
     assert!(config.ridge_lambda >= 0.0, "ridge_lambda must be >= 0");
     assert!(config.min_features >= 1, "min_features must be >= 1");
-    assert!(config.fitness_precision > 0.0, "fitness_precision must be > 0");
+    assert!(
+        config.fitness_precision > 0.0,
+        "fitness_precision must be > 0"
+    );
 
     let n_features = x.ncols();
 
@@ -267,13 +269,9 @@ pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
     let selected_indices = mask_to_indices(&best_mask);
     let selected_count = selected_indices.len();
 
-    let (raw_cv_score, penalized_score) = subset_score(
-        x.as_ref(),
-        y.as_ref(),
-        &selected_indices,
-        &config,
-    )
-    .unwrap_or((f64::NEG_INFINITY, f64::NEG_INFINITY));
+    let (raw_cv_score, penalized_score) =
+        subset_score(x.as_ref(), y.as_ref(), &selected_indices, &config)
+            .unwrap_or((f64::NEG_INFINITY, f64::NEG_INFINITY));
 
     let fitness_score = if penalized_score.is_finite() {
         (penalized_score / config.fitness_precision).round() as isize
@@ -371,8 +369,7 @@ fn subset_score(
         return None;
     }
 
-    let size_penalty =
-        config.size_penalty * (selected.len() as f64 / x.ncols().max(1) as f64);
+    let size_penalty = config.size_penalty * (selected.len() as f64 / x.ncols().max(1) as f64);
     let penalized_score = raw_cv_score - size_penalty;
 
     Some((raw_cv_score, penalized_score))
