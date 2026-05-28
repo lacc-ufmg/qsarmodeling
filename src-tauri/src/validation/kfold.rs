@@ -1,7 +1,7 @@
 use ndarray::{Array1, Array2, s};
 use crate::core::pls;
 use crate::utils::stats;
-use crate::validation::{CVResult, CVConfig};
+use crate::validation::{validation_metrics, CVResult, CVConfig};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
@@ -114,40 +114,20 @@ pub fn kfold_cv(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig, shuffle: bo
     let (y_min, y_max) = stats::min_max(y);
 
     for lv in 0..n_lv_max {
-        let ycv_col = ycv.column(lv);
-        let ycal_col = ycal.column(lv);
+        let ycv_col = ycv.column(lv).to_owned();
+        let ycal_col = ycal.column(lv).to_owned();
+        let metrics = validation_metrics(y, &ycv_col, &ycal_col, n, lv + 1, y_mean, y_min, y_max);
 
-        // Q² and RMSECV (CV metrics)
-        let q2_val = stats::r2(y, &ycv_col.to_owned(), Some(y_mean));
-        let rmsecv_val = stats::rmse(y, &ycv_col.to_owned());
-
-        // R² and RMSEC (calibration metrics)
-        let r2_val = stats::r2(y, &ycal_col.to_owned(), Some(y_mean));
-        let rmsec_val = stats::rmse(y, &ycal_col.to_owned());
-
-        // MAE
-        let mae_val = stats::mae(y, &ycal_col.to_owned());
-
-        // Correlation coefficients
-        let rcal_val = stats::pearson_r(y, &ycal_col.to_owned());
-        let rcv_val = stats::pearson_r(y, &ycv_col.to_owned());
-
-        // F-statistic for model significance
-        let f_stat_val = stats::f_stat(r2_val, n, lv + 1);
-
-        // Scaled R² metrics (avgRm, deltaRm)
-        let (avg_rm_val, delta_rm_val) = stats::rm2_metrics(y, &ycal_col.to_owned(), y_min, y_max);
-
-        q2.push(q2_val);
-        r2.push(r2_val);
-        rmsec.push(rmsec_val);
-        rmsecv.push(rmsecv_val);
-        mae.push(mae_val);
-        rcal.push(rcal_val);
-        rcv.push(rcv_val);
-        f_stat.push(f_stat_val);
-        avg_rm.push(avg_rm_val);
-        delta_rm.push(delta_rm_val);
+        q2.push(metrics.q2);
+        r2.push(metrics.r2);
+        rmsec.push(metrics.rmsec);
+        rmsecv.push(metrics.rmsecv);
+        mae.push(metrics.mae);
+        rcal.push(metrics.rcal);
+        rcv.push(metrics.rcv);
+        f_stat.push(metrics.f_stat);
+        avg_rm.push(metrics.avg_rm);
+        delta_rm.push(metrics.delta_rm);
     }
 
     CVResult {

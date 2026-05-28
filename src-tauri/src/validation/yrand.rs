@@ -1,7 +1,6 @@
 use ndarray::{Array1, Array2};
-use crate::core::pls;
 use crate::utils::stats;
-use crate::validation::{YRandomizationResult, CVConfig};
+use crate::validation::{loo_q2_rmsecv, YRandomizationResult, CVConfig};
 use rand::SeedableRng;
 
 /// Compute Y-Randomization validation
@@ -18,7 +17,6 @@ use rand::SeedableRng;
 /// YRandomizationResult with regression intercepts/slopes and validation metrics
 pub fn yrand_validation(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> YRandomizationResult {
     let n = x.nrows();
-    let p = x.ncols();
     let n_lv_max = config.n_lv_max.min(n - 1);
     let n_randomizations = config.n_folds; // Repurpose n_folds as n_randomizations
 
@@ -33,10 +31,6 @@ pub fn yrand_validation(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> 
     let mut r2_values = Vec::with_capacity(n_randomizations + 1);
     let mut rmsecv_values = Vec::with_capacity(n_randomizations + 1);
     let mut r_values = Vec::with_capacity(n_randomizations + 1); // Correlation between original and shuffled y
-
-    // Pre-allocate matrices for training
-    let mut x_tr = Array2::<f64>::zeros((n - 1, p));
-    let mut y_tr = Array1::<f64>::zeros(n - 1);
 
     // Normalize y for correlation calculation
     let y_mean = y.iter().copied().sum::<f64>() / n as f64;
@@ -63,75 +57,8 @@ pub fn yrand_validation(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> 
             0.0
         };
 
-        // Run LOO-CV on shuffled y
-        let mut q2_lv1 = 0.0;
-        let mut r2_lv1 = 0.0;
-        let mut rmsecv_lv1 = 0.0;
-
-        // LOO-CV on shuffled y (using n_lv_max = 1 for simplicity)
-        for i in 0..n {
-            let mut r = 0usize;
-            for j in 0..n {
-                if j != i {
-                    x_tr.row_mut(r).assign(&x.row(j));
-                    y_tr[r] = y_shuffled[j];
-                    r += 1;
-                }
-            }
-            let fit = pls::pls1_fit(&x_tr, &y_tr, n_lv_max);
-            let y_hat = pls::pls1_predict_row(&fit, x.row(i));
-            let err = y_shuffled[i] - y_hat;
-            rmsecv_lv1 += err * err;
-        }
-        rmsecv_lv1 = (rmsecv_lv1 / n as f64).sqrt();
-
-        // Calculate Q² and R² on shuffled y using the same approach
-        for i in 0..n {
-            let mut r = 0usize;
-            for j in 0..n {
-                if j != i {
-                    x_tr.row_mut(r).assign(&x.row(j));
-                    y_tr[r] = y_shuffled[j];
-                    r += 1;
-                }
-            }
-            let fit = pls::pls1_fit(&x_tr, &y_tr, n_lv_max);
-            let y_hat = pls::pls1_predict_row(&fit, x.row(i));
-
-            // For Q²/R² calculation we need predictions on all samples
-            // This is simplified; full implementation would track predictions
-            let _ = y_hat;
-        }
-
-        // Simplified Q² and R² - use dummy values for now
-        // In practice, would track all CV predictions like in LOO module
-        let shuffled_mean_full = y_shuffled.iter().copied().sum::<f64>() / n as f64;
-        let ssy_shuffled = y_shuffled
-            .iter()
-            .map(|&v| (v - shuffled_mean_full).powi(2))
-            .sum::<f64>();
-
-        if ssy_shuffled > 1e-14 {
-            let press_cv_shuffled = (0..n)
-                .map(|i| {
-                    let mut r = 0usize;
-                    for j in 0..n {
-                        if j != i {
-                            x_tr.row_mut(r).assign(&x.row(j));
-                            y_tr[r] = y_shuffled[j];
-                            r += 1;
-                        }
-                    }
-                    let fit = pls::pls1_fit(&x_tr, &y_tr, n_lv_max);
-                    let y_hat = pls::pls1_predict_row(&fit, x.row(i));
-                    (y_shuffled[i] - y_hat).powi(2)
-                })
-                .sum::<f64>();
-
-            q2_lv1 = 1.0 - (press_cv_shuffled / ssy_shuffled);
-        }
-
-        r2_lv1 = q2_lv1; // Simplified for randomization
+        let (q2_lv1, rmsecv_lv1) = loo_q2_rmsecv(x, &y_shuffled, n_lv_max);
+        let r2_lv1 = q2_lv1;
 
         q2_values.push(q2_lv1);
         r2_values.push(r2_lv1);
@@ -140,51 +67,8 @@ pub fn yrand_validation(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> 
     }
 
     // Run LOO-CV on original y to add as final point
-    let orig_y_mean = y.iter().copied().sum::<f64>() / n as f64;
-    let orig_ssy = y.iter().map(|&v| (v - orig_y_mean).powi(2)).sum::<f64>();
-
-    let n_lv = 1;
-    let (orig_q2, orig_r2, orig_rmsecv) = if orig_ssy > 1e-14 {
-        let mut q2_val = 0.0;
-        let mut rmsecv_val = 0.0;
-
-        for i in 0..n {
-            let mut r = 0usize;
-            for j in 0..n {
-                if j != i {
-                    x_tr.row_mut(r).assign(&x.row(j));
-                    y_tr[r] = y[j];
-                    r += 1;
-                }
-            }
-            let fit = pls::pls1_fit(&x_tr, &y_tr, n_lv);
-            let y_hat = pls::pls1_predict_row(&fit, x.row(i));
-            let err = y[i] - y_hat;
-            rmsecv_val += err * err;
-        }
-        rmsecv_val = (rmsecv_val / n as f64).sqrt();
-
-        let press_cv = (0..n)
-            .map(|i| {
-                let mut r = 0usize;
-                for j in 0..n {
-                    if j != i {
-                        x_tr.row_mut(r).assign(&x.row(j));
-                        y_tr[r] = y[j];
-                        r += 1;
-                    }
-                }
-                let fit = pls::pls1_fit(&x_tr, &y_tr, n_lv);
-                let y_hat = pls::pls1_predict_row(&fit, x.row(i));
-                (y[i] - y_hat).powi(2)
-            })
-            .sum::<f64>();
-
-        q2_val = 1.0 - (press_cv / orig_ssy);
-        (q2_val, q2_val, rmsecv_val)
-    } else {
-        (0.0, 0.0, 0.0)
-    };
+    let (orig_q2, orig_rmsecv) = loo_q2_rmsecv(x, y, 1);
+    let orig_r2 = orig_q2;
 
     q2_values.push(orig_q2);
     r2_values.push(orig_r2);

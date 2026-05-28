@@ -1,7 +1,7 @@
 use ndarray::{Array1, Array2};
 use crate::core::pls;
 use crate::utils::stats;
-use crate::validation::{CVResult, CVConfig};
+use crate::validation::{validation_metrics, CVResult, CVConfig};
 
 /// Compute Leave-One-Out Cross-Validation with comprehensive metrics
 ///
@@ -72,40 +72,20 @@ pub fn loo_cv(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> CVResult {
     let (y_min, y_max) = stats::min_max(y);
 
     for lv in 0..n_lv_max {
-        let ycv_col = ycv.column(lv);
-        let ycal_col = ycal.column(lv);
+        let ycv_col = ycv.column(lv).to_owned();
+        let ycal_col = ycal.column(lv).to_owned();
+        let metrics = validation_metrics(y, &ycv_col, &ycal_col, n, lv + 1, y_mean, y_min, y_max);
 
-        // Q² and RMSECV (CV metrics)
-        let q2_val = stats::r2(y, &ycv_col.to_owned(), Some(y_mean));
-        let rmsecv_val = stats::rmse(y, &ycv_col.to_owned());
-
-        // R² and RMSEC (calibration metrics)
-        let r2_val = stats::r2(y, &ycal_col.to_owned(), Some(y_mean));
-        let rmsec_val = stats::rmse(y, &ycal_col.to_owned());
-
-        // MAE
-        let mae_val = stats::mae(y, &ycal_col.to_owned());
-
-        // Correlation coefficients
-        let rcal_val = stats::pearson_r(y, &ycal_col.to_owned());
-        let rcv_val = stats::pearson_r(y, &ycv_col.to_owned());
-
-        // F-statistic for model significance
-        let f_stat_val = stats::f_stat(r2_val, n, lv + 1);
-
-        // Scaled R² metrics (avgRm, deltaRm)
-        let (avg_rm_val, delta_rm_val) = stats::rm2_metrics(y, &ycal_col.to_owned(), y_min, y_max);
-
-        q2.push(q2_val);
-        r2.push(r2_val);
-        rmsec.push(rmsec_val);
-        rmsecv.push(rmsecv_val);
-        mae.push(mae_val);
-        rcal.push(rcal_val);
-        rcv.push(rcv_val);
-        f_stat.push(f_stat_val);
-        avg_rm.push(avg_rm_val);
-        delta_rm.push(delta_rm_val);
+        q2.push(metrics.q2);
+        r2.push(metrics.r2);
+        rmsec.push(metrics.rmsec);
+        rmsecv.push(metrics.rmsecv);
+        mae.push(metrics.mae);
+        rcal.push(metrics.rcal);
+        rcv.push(metrics.rcv);
+        f_stat.push(metrics.f_stat);
+        avg_rm.push(metrics.avg_rm);
+        delta_rm.push(metrics.delta_rm);
     }
 
     CVResult {
@@ -124,42 +104,15 @@ pub fn loo_cv(x: &Array2<f64>, y: &Array1<f64>, config: &CVConfig) -> CVResult {
     }
 }
 
-/// Legacy function: Compute LOO RMSECV for a single LV (backward compatibility)
-pub fn loo_rmsecv(x: &Array2<f64>, y: &Array1<f64>, n_lv: usize) -> f64 {
-    let n = x.nrows();
-    let p = x.ncols();
-
-    let mut x_tr = Array2::<f64>::zeros((n - 1, p));
-    let mut y_tr = Array1::<f64>::zeros(n - 1);
-    let mut sse = 0.0_f64;
-
-    for i in 0..n {
-        let mut r = 0usize;
-        for j in 0..n {
-            if j != i {
-                x_tr.row_mut(r).assign(&x.row(j));
-                y_tr[r] = y[j];
-                r += 1;
-            }
-        }
-        let fit = pls::pls1_fit(&x_tr, &y_tr, n_lv);
-        let y_hat = pls::pls1_predict_row(&fit, x.row(i));
-        sse += (y[i] - y_hat).powi(2);
-    }
-
-    (sse / n as f64).sqrt()
-}
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use ndarray::{Array1, Array2};
 
     // For y = 2x (perfect linear), every LOO fold fits exactly through the
-    // training points → each held-out prediction is exact → RMSECV = 0.
+    // training points → each held-out prediction is exact → Q² = 1 and RMSECV = 0.
     #[test]
-    fn loo_rmsecv_zero_for_perfectly_linear_data() {
+    fn loo_q2_rmsecv_zero_for_perfectly_linear_data() {
         let x = Array2::from_shape_vec(
             (6, 1),
             vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
@@ -167,13 +120,14 @@ mod tests {
         .unwrap();
         let y = Array1::from_vec(vec![2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
 
-        let rmsecv = loo_rmsecv(&x, &y, 1);
+        let (q2, rmsecv) = crate::validation::loo_q2_rmsecv(&x, &y, 1);
+        assert!(q2 > 0.99, "Q²={q2:.2e}, expected ~1 for y=2x");
         assert!(rmsecv < 1e-9, "RMSECV={rmsecv:.2e}, expected ~0 for y=2x");
     }
 
     // For arbitrary data RMSECV must be non-negative and finite.
     #[test]
-    fn loo_rmsecv_is_finite_and_non_negative() {
+    fn loo_q2_rmsecv_is_finite_and_non_negative() {
         let x = Array2::from_shape_vec(
             (5, 2),
             vec![
@@ -187,7 +141,8 @@ mod tests {
         .unwrap();
         let y = Array1::from_vec(vec![1.0, 3.0, 2.0, 4.0, 2.5]);
 
-        let rmsecv = loo_rmsecv(&x, &y, 1);
+        let (q2, rmsecv) = crate::validation::loo_q2_rmsecv(&x, &y, 1);
+        assert!(q2.is_finite());
         assert!(rmsecv >= 0.0);
         assert!(rmsecv.is_finite());
     }

@@ -2,7 +2,9 @@ pub mod loo;
 pub mod lno;
 pub mod kfold;
 pub mod yrand;
+pub mod metrics;
 
+use metrics::*;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for cross-validation runs

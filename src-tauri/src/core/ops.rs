@@ -16,7 +16,7 @@ use ndarray::{Array1, Array2};
 use serde::{Deserialize, Serialize};
 use super::pls;
 use crate::utils::*;
-use crate::validation::loo::loo_rmsecv;
+use crate::validation::metrics::loo_q2_rmsecv;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -92,7 +92,7 @@ pub fn run_ops(x: &Array2<f64>, y: &Array1<f64>, config: &OpsConfig) -> OpsResul
 
         // In each LOO fold training has n−1 rows; clamp LVs to stay valid.
         let lv = lv_m.min(k).min(n.saturating_sub(2)).max(1);
-        let rmsecv = loo_rmsecv(&x_sub, y, lv);
+        let (_q2, rmsecv) = loo_q2_rmsecv(&x_sub, y, lv);
 
         trace.push((k, rmsecv));
         if rmsecv < best_rmsecv {
