@@ -1,5 +1,6 @@
 use ndarray::{Array1};
 
+
 #[inline]
 pub fn min_max(y: &Array1<f64>) -> (f64, f64) {
     let mut min = f64::INFINITY;
@@ -177,4 +178,57 @@ pub fn pearson_r(yreal: &Array1<f64>, ypred: &Array1<f64>) -> f64 {
     }
 
     cov / (var_y.sqrt() * var_p.sqrt())
+}
+
+/// F-statistic for regression: F = (n - nLV - 1) * R² / (nLV * (1 - R²))
+#[inline]
+pub fn f_stat(r2: f64, n: usize, n_lv: usize) -> f64 {
+    if n_lv == 0 || n <= n_lv + 1 || r2 >= 1.0 {
+        return 0.0;
+    }
+    let numerator = (n as f64 - n_lv as f64 - 1.0) * r2;
+    let denominator = n_lv as f64 * (1.0 - r2);
+    if denominator == 0.0 {
+        0.0
+    } else {
+        numerator / denominator
+    }
+}
+
+/// Simple Ordinary Least Squares (OLS) linear regression: y ~ a + b*x
+/// Returns (intercept, slope)
+///
+/// # Arguments
+/// * `x` - Predictor variable
+/// * `y` - Response variable
+///
+/// # Returns
+/// (intercept, slope) tuple
+#[inline]
+pub fn linear_regression(x: &Array1<f64>, y: &Array1<f64>) -> (f64, f64) {
+    debug_assert_eq!(x.len(), y.len());
+
+    let n = x.len() as f64;
+    let mean_x = x.iter().copied().sum::<f64>() / n;
+    let mean_y = y.iter().copied().sum::<f64>() / n;
+
+    let mut ss_xy = 0.0; // covariance
+    let mut ss_xx = 0.0; // variance of x
+
+    for (&xi, &yi) in x.iter().zip(y.iter()) {
+        let dx = xi - mean_x;
+        let dy = yi - mean_y;
+        ss_xy += dx * dy;
+        ss_xx += dx * dx;
+    }
+
+    if ss_xx == 0.0 {
+        // No variance in x → undefined slope
+        return (mean_y, 0.0);
+    }
+
+    let slope = ss_xy / ss_xx;
+    let intercept = mean_y - slope * mean_x;
+
+    (intercept, slope)
 }

@@ -4,6 +4,7 @@ pub mod loader;
 pub mod session;
 pub mod types;
 pub mod ops;
+pub mod ga;
 pub mod commands;
 pub mod stats;
 pub mod pls;
