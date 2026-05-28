@@ -1,31 +1,16 @@
-//! Ordered Predictors Selection (OPS) for PLS1-based feature selection.
-//!
-//! ## Algorithm
-//!
-//! **Phase 1 – ranking.**  Fit a global PLS1 model on the full feature matrix
-//! with [`OpsConfig::latent_vars_ops`] components.  Rank features by
-//! descending |β| (*informative vector*).
-//!
-//! **Phase 2 – selection.**  Starting at [`OpsConfig::min_vars_model`] and
-//! stepping by ⌈n_features × [`OpsConfig::vars_percentage`]⌉, evaluate each
-//! candidate sub-model (top-k ranked columns) by leave-one-out RMSECV with
-//! [`OpsConfig::latent_vars_model`] PLS components.  Return the sub-model
-//! with the lowest RMSECV.
+use ndarray::{Array1, Array2, Axis, Zip, s};
+use crate::utils::mat_inv_gauss;
 
-use ndarray::{s, Array1, Array2, Axis, Zip};
-use serde::{Deserialize, Serialize};
-
-
-struct PlsFit {
+pub struct PlsFit {
     /// Regression vector in the centered feature space: ŷ_c = Xc · β.
-    beta: Array1<f64>,
+    pub beta: Array1<f64>,
     /// Column means of X (used to center new samples before prediction).
-    x_mean: Array1<f64>,
+    pub x_mean: Array1<f64>,
     /// Mean of y (added back after the centered prediction).
-    y_mean: f64,
+    pub y_mean: f64,
 }
 
-fn pls1_fit(x: &Array2<f64>, y: &Array1<f64>, n_lv: usize) -> PlsFit {
+pub fn pls1_fit(x: &Array2<f64>, y: &Array1<f64>, n_lv: usize) -> PlsFit {
     let x_mean = x.mean_axis(Axis(0)).unwrap();
     let y_mean = y.mean().unwrap_or(0.0);
 
@@ -42,7 +27,7 @@ fn pls1_fit(x: &Array2<f64>, y: &Array1<f64>, n_lv: usize) -> PlsFit {
 /// Predict a single row.  The row must have the same number of columns as the
 /// training X used to produce `fit`.
 #[inline]
-fn pls1_predict_row(fit: &PlsFit, x_row: ndarray::ArrayView1<'_, f64>) -> f64 {
+pub fn pls1_predict_row(fit: &PlsFit, x_row: ndarray::ArrayView1<'_, f64>) -> f64 {
     let xc = &x_row - &fit.x_mean;
     xc.dot(&fit.beta) + fit.y_mean
 }
@@ -115,32 +100,113 @@ fn nipals_beta(xc: &Array2<f64>, yc: &Array1<f64>, n_lv: usize) -> Array1<f64> {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Leave-one-out cross-validation
-// ─────────────────────────────────────────────────────────────────────────────
 
-fn loo_rmsecv(x: &Array2<f64>, y: &Array1<f64>, n_lv: usize) -> f64 {
-    let n = x.nrows();
-    let p = x.ncols();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::{Array1, Array2};
 
-    // Pre-allocate training buffers; reused every fold to avoid allocation.
-    let mut x_tr = Array2::<f64>::zeros((n - 1, p));
-    let mut y_tr = Array1::<f64>::zeros(n - 1);
-    let mut sse  = 0.0_f64;
+    const EPS: f64 = 1e-9;
 
-    for i in 0..n {
-        let mut r = 0usize;
-        for j in 0..n {
-            if j != i {
-                x_tr.row_mut(r).assign(&x.row(j));
-                y_tr[r] = y[j];
-                r += 1;
-            }
-        }
-        let fit   = pls1_fit(&x_tr, &y_tr, n_lv);
-        let y_hat = pls1_predict_row(&fit, x.row(i));
-        sse += (y[i] - y_hat).powi(2);
+    // Single feature, perfect linear: y = 2 x (centered).
+    //
+    // Manual derivation (n=5):
+    //   xc = [-2,-1,0,1,2],  yc = [-4,-2,0,2,4]
+    //   w = X^Ty / ‖X^Ty‖ = 20/20 = 1
+    //   t = xc,  tt = 10
+    //   p = X^Tt/tt = 10/10 = 1,  q = y^Tt/tt = 20/10 = 2
+    //   β = W(P^TW)^{-1}q = 1·1·2 = 2  ✓
+    #[test]
+    fn nipals_beta_single_feature_perfect_linear() {
+        let xc = Array2::from_shape_vec((5, 1), vec![-2.0, -1.0, 0.0, 1.0, 2.0]).unwrap();
+        let yc = Array1::from_vec(vec![-4.0, -2.0, 0.0, 2.0, 4.0]);
+
+        let beta = nipals_beta(&xc, &yc, 1);
+
+        assert_eq!(beta.len(), 1);
+        assert!((beta[0] - 2.0).abs() < EPS, "β[0]={}", beta[0]);
     }
 
-    (sse / n as f64).sqrt()
+    // Three features: col0 is the signal, col1 and col2 are zero-correlated
+    // noise (orthogonal to y in the centered space).
+    //
+    // Orthogonality proof (n=4, y=[1,2,3,4], y_c=[-1.5,-0.5,0.5,1.5]):
+    //   col1 = [1,-2,1,0]: y_c·col1 = -1.5+1+0.5+0 = 0  ✓
+    //   col2 = [0,1,-2,1]: y_c·col2 =  0 -0.5-1+1.5 = 0  ✓
+    //
+    // Therefore X^Ty = [5, 0, 0], w=[1,0,0], β=[1,0,0].
+    #[test]
+    fn nipals_beta_identifies_signal_among_orthogonal_noise() {
+        let x = Array2::from_shape_vec(
+            (4, 3),
+            vec![
+                1.0,  1.0,  0.0,
+                2.0, -2.0,  1.0,
+                3.0,  1.0, -2.0,
+                4.0,  0.0,  1.0,
+            ],
+        )
+        .unwrap();
+        let y    = Array1::from_vec(vec![1.0, 2.0, 3.0, 4.0]);
+        let x_m  = x.mean_axis(Axis(0)).unwrap();
+        let y_m  = y.mean().unwrap();
+        let xc   = &x - &x_m.view().insert_axis(Axis(0));
+        let yc   = &y - y_m;
+
+        let beta = nipals_beta(&xc, &yc, 1);
+
+        assert!(
+            (beta[0] - 1.0).abs() < EPS,
+            "β[0] should be 1.0, got {}", beta[0]
+        );
+        assert!(beta[1].abs() < EPS, "β[1] should be 0, got {}", beta[1]);
+        assert!(beta[2].abs() < EPS, "β[2] should be 0, got {}", beta[2]);
+    }
+
+    // Requesting more LVs than the data can support should not corrupt β.
+    // With a rank-1 X (only one non-zero IV direction), h_max=1 regardless
+    // of n_lv; the result must equal the n_lv=1 case.
+    #[test]
+    fn nipals_beta_excess_lv_request_equals_rank1_result() {
+        let xc = Array2::from_shape_vec((5, 1), vec![-2.0, -1.0, 0.0, 1.0, 2.0]).unwrap();
+        let yc = Array1::from_vec(vec![-4.0, -2.0, 0.0, 2.0, 4.0]);
+
+        let beta_1  = nipals_beta(&xc, &yc, 1);
+        let beta_10 = nipals_beta(&xc, &yc, 10); // far more than rank(X)
+
+        assert!(
+            (beta_1[0] - beta_10[0]).abs() < EPS,
+            "excessive n_lv changed β: {:.6} vs {:.6}", beta_1[0], beta_10[0]
+        );
+    }
+
+    // =========================================================================
+    // pls1_fit / pls1_predict_row
+    // =========================================================================
+
+    // y = 3 x → β = 3, x_mean = 3, y_mean = 9.
+    // Each training row must be predicted exactly.
+    #[test]
+    fn pls1_fit_and_predict_perfect_linear_single_feature() {
+        let x = Array2::from_shape_vec(
+            (5, 1),
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+        )
+        .unwrap();
+        let y = Array1::from_vec(vec![3.0, 6.0, 9.0, 12.0, 15.0]);
+
+        let fit = pls1_fit(&x, &y, 1);
+
+        assert!((fit.beta[0]  - 3.0).abs() < EPS, "β[0]={}", fit.beta[0]);
+        assert!((fit.x_mean[0] - 3.0).abs() < EPS);
+        assert!((fit.y_mean    - 9.0).abs() < EPS);
+
+        for i in 0..5 {
+            let y_hat = pls1_predict_row(&fit, x.row(i));
+            assert!(
+                (y_hat - y[i]).abs() < EPS,
+                "row {i}: ŷ={y_hat:.6}, y={:.6}", y[i]
+            );
+        }
+    }
 }

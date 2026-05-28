@@ -5,6 +5,8 @@ pub mod session;
 pub mod types;
 pub mod ops;
 pub mod commands;
+pub mod stats;
+pub mod pls;
 
 pub use filter::*;
 pub use loader::{load_dataset, RawDataset};

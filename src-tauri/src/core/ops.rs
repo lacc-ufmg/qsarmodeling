@@ -12,12 +12,11 @@
 //! [`OpsConfig::latent_vars_model`] PLS components.  Return the sub-model
 //! with the lowest RMSECV.
 
-use ndarray::{s, Array1, Array2, Axis, Zip};
+use ndarray::{Array1, Array2};
 use serde::{Deserialize, Serialize};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Public API
-// ─────────────────────────────────────────────────────────────────────────────
+use super::pls;
+use crate::utils::*;
+use crate::validation::loo::loo_rmsecv;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,9 +45,11 @@ pub struct OpsResult {
     pub best_rmsecv: f64,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Entry point
-// ─────────────────────────────────────────────────────────────────────────────
+impl OpsConfig {
+    pub fn run(&self, x: &Array2<f64>, y: &Array1<f64>) -> OpsResult {
+        run_ops(x, y, self)
+    }
+}
 
 /// Run OPS on feature matrix `x` (columns = features) and target `y`.
 /// `x` is expected to already be filtered and normalised by the preceding
@@ -66,7 +67,7 @@ pub fn run_ops(x: &Array2<f64>, y: &Array1<f64>, config: &OpsConfig) -> OpsResul
 
     // ── Phase 1: informative vector ──────────────────────────────────────────
     let lv_ops = config.latent_vars_ops.min(p).min(n - 1).max(1);
-    let iv = pls1_fit(x, y, lv_ops).beta;
+    let iv = pls::pls1_fit(x, y, lv_ops).beta;
 
     let mut ranked: Vec<usize> = (0..p).collect();
     ranked.sort_unstable_by(|&a, &b| {
@@ -113,441 +114,17 @@ pub fn run_ops(x: &Array2<f64>, y: &Array1<f64>, config: &OpsConfig) -> OpsResul
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PLS1 – NIPALS
-// ─────────────────────────────────────────────────────────────────────────────
 
-struct PlsFit {
-    /// Regression vector in the centered feature space: ŷ_c = Xc · β.
-    beta: Array1<f64>,
-    /// Column means of X (used to center new samples before prediction).
-    x_mean: Array1<f64>,
-    /// Mean of y (added back after the centered prediction).
-    y_mean: f64,
-}
-
-fn pls1_fit(x: &Array2<f64>, y: &Array1<f64>, n_lv: usize) -> PlsFit {
-    let x_mean = x.mean_axis(Axis(0)).unwrap();
-    let y_mean = y.mean().unwrap_or(0.0);
-
-    let xc = x - &x_mean.view().insert_axis(Axis(0));
-    let yc = y - y_mean;
-
-    PlsFit {
-        beta: nipals_beta(&xc, &yc, n_lv),
-        x_mean,
-        y_mean,
-    }
-}
-
-/// Predict a single row.  The row must have the same number of columns as the
-/// training X used to produce `fit`.
-#[inline]
-fn pls1_predict_row(fit: &PlsFit, x_row: ndarray::ArrayView1<'_, f64>) -> f64 {
-    let xc = &x_row - &fit.x_mean;
-    xc.dot(&fit.beta) + fit.y_mean
-}
-
-/// NIPALS core loop on **pre-centered** data.
-/// Returns β such that ŷ_c = Xc · β.
-///
-/// Only the components actually extracted (up to `n_lv`) are used to build β,
-/// so an early termination due to numerical zero does not corrupt the result.
-fn nipals_beta(xc: &Array2<f64>, yc: &Array1<f64>, n_lv: usize) -> Array1<f64> {
-    let (_, p) = xc.dim();
-
-    let mut xd = xc.to_owned();
-    let mut yd = yc.to_owned();
-
-    // W (p × n_lv) – weight vectors
-    // P (p × n_lv) – X-loading vectors
-    // q (n_lv)     – y-loading scalars
-    let mut w_mat = Array2::<f64>::zeros((p, n_lv));
-    let mut p_mat = Array2::<f64>::zeros((p, n_lv));
-    let mut q_vec = Array1::<f64>::zeros(n_lv);
-    let mut h_max = 0usize; // components successfully extracted
-
-    for h in 0..n_lv {
-        // w_h = X^T y / ‖X^T y‖  (direction of maximum X–y covariance)
-        let xty: Array1<f64> = xd.t().dot(&yd);
-        let norm = xty.dot(&xty).sqrt();
-        if norm < 1e-14 {
-            break; // no residual variance left to model
-        }
-        let w = xty / norm;
-
-        // t_h = X w_h  (X-score)
-        let t: Array1<f64> = xd.dot(&w);
-        let tt = t.dot(&t);
-        if tt < 1e-14 {
-            break;
-        }
-
-        // p_h = X^T t / ‖t‖²,   q_h = y^T t / ‖t‖²  (loadings)
-        let p_h: Array1<f64> = xd.t().dot(&t) / tt;
-        let q_h: f64         = yd.dot(&t) / tt;
-
-        // Deflate: X ← X − t p_h^T,   y ← y − q_h t
-        Zip::from(xd.rows_mut()).and(&t).for_each(|mut row, &ti| {
-            row.scaled_add(-ti, &p_h);
-        });
-        yd = yd - &(&t * q_h);
-
-        w_mat.column_mut(h).assign(&w);
-        p_mat.column_mut(h).assign(&p_h);
-        q_vec[h] = q_h;
-        h_max = h + 1;
-    }
-
-    if h_max == 0 {
-        return Array1::zeros(p);
-    }
-
-    // Restrict matrices to the h_max components that were actually extracted.
-    let w_h = w_mat.slice(s![.., ..h_max]).to_owned(); // p   × h_max
-    let p_h = p_mat.slice(s![.., ..h_max]).to_owned(); // p   × h_max
-    let q_h = q_vec.slice(s![..h_max]).to_owned();      // h_max
-
-    // β = W (P^T W)^{-1} q   [Helland 1988 / de Jong 1993]
-    let ptw: Array2<f64> = p_h.t().dot(&w_h); // h_max × h_max
-    match mat_inv_gauss(ptw) {
-        Some(ptw_inv) => w_h.dot(&ptw_inv).dot(&q_h),
-        None => Array1::zeros(p), // degenerate model
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Leave-one-out cross-validation
-// ─────────────────────────────────────────────────────────────────────────────
-
-fn loo_rmsecv(x: &Array2<f64>, y: &Array1<f64>, n_lv: usize) -> f64 {
-    let n = x.nrows();
-    let p = x.ncols();
-
-    // Pre-allocate training buffers; reused every fold to avoid allocation.
-    let mut x_tr = Array2::<f64>::zeros((n - 1, p));
-    let mut y_tr = Array1::<f64>::zeros(n - 1);
-    let mut sse  = 0.0_f64;
-
-    for i in 0..n {
-        let mut r = 0usize;
-        for j in 0..n {
-            if j != i {
-                x_tr.row_mut(r).assign(&x.row(j));
-                y_tr[r] = y[j];
-                r += 1;
-            }
-        }
-        let fit   = pls1_fit(&x_tr, &y_tr, n_lv);
-        let y_hat = pls1_predict_row(&fit, x.row(i));
-        sse += (y[i] - y_hat).powi(2);
-    }
-
-    (sse / n as f64).sqrt()
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Utilities
-// ─────────────────────────────────────────────────────────────────────────────
-
-fn select_columns(x: &Array2<f64>, cols: &[usize]) -> Array2<f64> {
-    let n = x.nrows();
-    let mut out = Array2::<f64>::zeros((n, cols.len()));
-    for (new_j, &old_j) in cols.iter().enumerate() {
-        out.column_mut(new_j).assign(&x.column(old_j));
-    }
-    out
-}
-
-/// Gauss-Jordan matrix inverse with partial column pivoting.
-/// Returns `None` for (near-)singular matrices (|pivot| < 1 × 10⁻¹²).
-fn mat_inv_gauss(a: Array2<f64>) -> Option<Array2<f64>> {
-    let n = a.nrows();
-    debug_assert_eq!(a.ncols(), n);
-
-    // Build the augmented matrix [A | I_n].
-    let mut aug = Array2::<f64>::zeros((n, 2 * n));
-    aug.slice_mut(s![.., ..n]).assign(&a);
-    for i in 0..n {
-        aug[[i, n + i]] = 1.0;
-    }
-
-    for col in 0..n {
-        // Partial pivoting: bring the largest |value| in this column to the diagonal.
-        let pivot_row = (col..n)
-            .max_by(|&r1, &r2| {
-                aug[[r1, col]]
-                    .abs()
-                    .partial_cmp(&aug[[r2, col]].abs())
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .unwrap();
-
-        if pivot_row != col {
-            for j in 0..2 * n {
-                let tmp            = aug[[col, j]];
-                aug[[col, j]]      = aug[[pivot_row, j]];
-                aug[[pivot_row, j]] = tmp;
-            }
-        }
-
-        let pivot = aug[[col, col]];
-        if pivot.abs() < 1e-12 {
-            return None;
-        }
-
-        let inv_pivot = 1.0 / pivot;
-        for j in 0..2 * n {
-            aug[[col, j]] *= inv_pivot;
-        }
-
-        for row in 0..n {
-            if row == col {
-                continue;
-            }
-            let f = aug[[row, col]];
-            if f.abs() < 1e-15 {
-                continue;
-            }
-            for j in 0..2 * n {
-                let d = aug[[col, j]] * f;
-                aug[[row, j]] -= d;
-            }
-        }
-    }
-
-    Some(aug.slice(s![.., n..]).to_owned())
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tests
-// ─────────────────────────────────────────────────────────────────────────────
 #[cfg(test)]
 mod tests {
     use super::*;
     use ndarray::{Array1, Array2};
 
-    const EPS: f64 = 1e-9;
-
-    // =========================================================================
-    // mat_inv_gauss
-    // =========================================================================
-
-    #[test]
-    fn mat_inv_inverts_1x1() {
-        let a = Array2::from_shape_vec((1, 1), vec![4.0]).unwrap();
-        let inv = mat_inv_gauss(a).unwrap();
-        assert!((inv[[0, 0]] - 0.25).abs() < EPS);
-    }
-
-    #[test]
-    fn mat_inv_inverts_2x2_diagonal() {
-        // [[2, 0], [0, 5]]  →  [[0.5, 0], [0, 0.2]]
-        let a = Array2::from_shape_vec((2, 2), vec![2.0, 0.0, 0.0, 5.0]).unwrap();
-        let inv = mat_inv_gauss(a).unwrap();
-        assert!((inv[[0, 0]] - 0.5).abs() < EPS);
-        assert!((inv[[1, 1]] - 0.2).abs() < EPS);
-        assert!(inv[[0, 1]].abs() < EPS);
-        assert!(inv[[1, 0]].abs() < EPS);
-    }
-
-    #[test]
-    fn mat_inv_inverts_2x2_dense() {
-        // [[3, 1], [2, 4]]  →  1/10 · [[4, -1], [-2, 3]]
-        let a = Array2::from_shape_vec((2, 2), vec![3.0, 1.0, 2.0, 4.0]).unwrap();
-        let inv = mat_inv_gauss(a).unwrap();
-        assert!((inv[[0, 0]] -  0.4).abs() < EPS);
-        assert!((inv[[0, 1]] - -0.1).abs() < EPS);
-        assert!((inv[[1, 0]] - -0.2).abs() < EPS);
-        assert!((inv[[1, 1]] -  0.3).abs() < EPS);
-    }
-
-    #[test]
-    fn mat_inv_product_with_original_is_identity() {
-        // 3 × 3 non-trivial dense matrix
-        let a = Array2::from_shape_vec(
-            (3, 3),
-            vec![1.0, 2.0, 0.0, 3.0, 4.0, 1.0, 0.0, 1.0, 2.0],
-        )
-        .unwrap();
-        let inv = mat_inv_gauss(a.clone()).unwrap();
-        let prod = a.dot(&inv);
-
-        for i in 0..3 {
-            for j in 0..3 {
-                let expected = if i == j { 1.0 } else { 0.0 };
-                assert!(
-                    (prod[[i, j]] - expected).abs() < 1e-10,
-                    "A·A⁻¹[{i},{j}] = {:.2e}, expected {expected}",
-                    prod[[i, j]]
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn mat_inv_returns_none_for_singular_matrix() {
-        // rank-1 matrix: second row = 2 × first row
-        let a = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 2.0, 4.0]).unwrap();
-        assert!(mat_inv_gauss(a).is_none());
-    }
-
-    // =========================================================================
-    // nipals_beta
-    // =========================================================================
-
-    // Single feature, perfect linear: y = 2 x (centered).
-    //
-    // Manual derivation (n=5):
-    //   xc = [-2,-1,0,1,2],  yc = [-4,-2,0,2,4]
-    //   w = X^Ty / ‖X^Ty‖ = 20/20 = 1
-    //   t = xc,  tt = 10
-    //   p = X^Tt/tt = 10/10 = 1,  q = y^Tt/tt = 20/10 = 2
-    //   β = W(P^TW)^{-1}q = 1·1·2 = 2  ✓
-    #[test]
-    fn nipals_beta_single_feature_perfect_linear() {
-        let xc = Array2::from_shape_vec((5, 1), vec![-2.0, -1.0, 0.0, 1.0, 2.0]).unwrap();
-        let yc = Array1::from_vec(vec![-4.0, -2.0, 0.0, 2.0, 4.0]);
-
-        let beta = nipals_beta(&xc, &yc, 1);
-
-        assert_eq!(beta.len(), 1);
-        assert!((beta[0] - 2.0).abs() < EPS, "β[0]={}", beta[0]);
-    }
-
-    // Three features: col0 is the signal, col1 and col2 are zero-correlated
-    // noise (orthogonal to y in the centered space).
-    //
-    // Orthogonality proof (n=4, y=[1,2,3,4], y_c=[-1.5,-0.5,0.5,1.5]):
-    //   col1 = [1,-2,1,0]: y_c·col1 = -1.5+1+0.5+0 = 0  ✓
-    //   col2 = [0,1,-2,1]: y_c·col2 =  0 -0.5-1+1.5 = 0  ✓
-    //
-    // Therefore X^Ty = [5, 0, 0], w=[1,0,0], β=[1,0,0].
-    #[test]
-    fn nipals_beta_identifies_signal_among_orthogonal_noise() {
-        let x = Array2::from_shape_vec(
-            (4, 3),
-            vec![
-                1.0,  1.0,  0.0,
-                2.0, -2.0,  1.0,
-                3.0,  1.0, -2.0,
-                4.0,  0.0,  1.0,
-            ],
-        )
-        .unwrap();
-        let y    = Array1::from_vec(vec![1.0, 2.0, 3.0, 4.0]);
-        let x_m  = x.mean_axis(Axis(0)).unwrap();
-        let y_m  = y.mean().unwrap();
-        let xc   = &x - &x_m.view().insert_axis(Axis(0));
-        let yc   = &y - y_m;
-
-        let beta = nipals_beta(&xc, &yc, 1);
-
-        assert!(
-            (beta[0] - 1.0).abs() < EPS,
-            "β[0] should be 1.0, got {}", beta[0]
-        );
-        assert!(beta[1].abs() < EPS, "β[1] should be 0, got {}", beta[1]);
-        assert!(beta[2].abs() < EPS, "β[2] should be 0, got {}", beta[2]);
-    }
-
-    // Requesting more LVs than the data can support should not corrupt β.
-    // With a rank-1 X (only one non-zero IV direction), h_max=1 regardless
-    // of n_lv; the result must equal the n_lv=1 case.
-    #[test]
-    fn nipals_beta_excess_lv_request_equals_rank1_result() {
-        let xc = Array2::from_shape_vec((5, 1), vec![-2.0, -1.0, 0.0, 1.0, 2.0]).unwrap();
-        let yc = Array1::from_vec(vec![-4.0, -2.0, 0.0, 2.0, 4.0]);
-
-        let beta_1  = nipals_beta(&xc, &yc, 1);
-        let beta_10 = nipals_beta(&xc, &yc, 10); // far more than rank(X)
-
-        assert!(
-            (beta_1[0] - beta_10[0]).abs() < EPS,
-            "excessive n_lv changed β: {:.6} vs {:.6}", beta_1[0], beta_10[0]
-        );
-    }
-
-    // =========================================================================
-    // pls1_fit / pls1_predict_row
-    // =========================================================================
-
-    // y = 3 x → β = 3, x_mean = 3, y_mean = 9.
-    // Each training row must be predicted exactly.
-    #[test]
-    fn pls1_fit_and_predict_perfect_linear_single_feature() {
-        let x = Array2::from_shape_vec(
-            (5, 1),
-            vec![1.0, 2.0, 3.0, 4.0, 5.0],
-        )
-        .unwrap();
-        let y = Array1::from_vec(vec![3.0, 6.0, 9.0, 12.0, 15.0]);
-
-        let fit = pls1_fit(&x, &y, 1);
-
-        assert!((fit.beta[0]  - 3.0).abs() < EPS, "β[0]={}", fit.beta[0]);
-        assert!((fit.x_mean[0] - 3.0).abs() < EPS);
-        assert!((fit.y_mean    - 9.0).abs() < EPS);
-
-        for i in 0..5 {
-            let y_hat = pls1_predict_row(&fit, x.row(i));
-            assert!(
-                (y_hat - y[i]).abs() < EPS,
-                "row {i}: ŷ={y_hat:.6}, y={:.6}", y[i]
-            );
-        }
-    }
-
-    // =========================================================================
-    // loo_rmsecv
-    // =========================================================================
-
-    // For y = 2x (perfect linear), every LOO fold fits exactly through the
-    // training points → each held-out prediction is exact → RMSECV = 0.
-    #[test]
-    fn loo_rmsecv_zero_for_perfectly_linear_data() {
-        let x = Array2::from_shape_vec(
-            (6, 1),
-            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-        )
-        .unwrap();
-        let y = Array1::from_vec(vec![2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
-
-        let rmsecv = loo_rmsecv(&x, &y, 1);
-        assert!(rmsecv < 1e-9, "RMSECV={rmsecv:.2e}, expected ~0 for y=2x");
-    }
-
-    // For arbitrary data RMSECV must be non-negative and finite.
-    #[test]
-    fn loo_rmsecv_is_finite_and_non_negative() {
-        let x = Array2::from_shape_vec(
-            (5, 2),
-            vec![
-                1.0, 0.0,
-                2.0, 1.0,
-                3.0,-1.0,
-                4.0, 0.5,
-                5.0,-0.5,
-            ],
-        )
-        .unwrap();
-        let y = Array1::from_vec(vec![1.0, 3.0, 2.0, 4.0, 2.5]);
-
-        let rmsecv = loo_rmsecv(&x, &y, 1);
-        assert!(rmsecv >= 0.0);
-        assert!(rmsecv.is_finite());
-    }
-
-    // =========================================================================
-    // run_ops  (integration)
-    // =========================================================================
-    //
     // Dataset (n=4, p=3):
     //   y      = [1, 2, 3, 4]
     //   col 0  = y              (perfect predictor)
     //   col 1  = [1,-2, 1, 0]  (zero correlation with y, see orthogonality proof above)
     //   col 2  = [0, 1,-2, 1]  (zero correlation with y)
-
     fn ops_test_dataset() -> (Array2<f64>, Array1<f64>) {
         let x = Array2::from_shape_vec(
             (4, 3),
