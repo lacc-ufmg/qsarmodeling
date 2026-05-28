@@ -2,7 +2,6 @@ import { Box, Button, Checkbox, Paper, Stack, Text } from "@mantine/core";
 import { IconFilter, IconX, IconCheck } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
-import { ExpandableSection } from "../ui/ExpandableSection";
 import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
 import type { DatasetMetadata, FilterConfig } from "../../generated";
 import { StatsRing } from "../ui/StatsRing";
@@ -46,8 +45,9 @@ export function FilterPanel ({
             </Text>
             <Box>
               <SliderFieldWithTooltip
-                label="Variance cut"
-                help="Removes descriptors with low variance across samples. Higher values filter more aggressively."
+                label="Variance filter"
+                help="Minimum variance to keep a feature. Higher values filter more aggressively."
+                inverted
                 value={filterSettings.varianceCut}
                 min={0}
                 max={1}
@@ -56,9 +56,10 @@ export function FilterPanel ({
               />
 
               <SliderFieldWithTooltip
-                label="Correlation cut"
-                help="Removes highly correlated descriptors to reduce multicollinearity. Higher values filter more aggressively."
+                label="Correlation filter"
+                help="Minimum feature-target correlation threshold. Higher values filter more aggressively."
                 value={filterSettings.correlationCut}
+                inverted
                 min={0}
                 max={1}
                 step={0.01}
@@ -66,9 +67,8 @@ export function FilterPanel ({
               />
 
               <SliderFieldWithTooltip
-                label="Autocorrelation cut"
-                help="Removes descriptors with high autocorrelation within themselves. Lower values filter more aggressively."
-                inverted
+                label="Collinearity filter"
+                help="Maximum correlation between features. Lower values filter more aggressively."
                 value={filterSettings.autocorrelationCut}
                 min={0}
                 max={1}

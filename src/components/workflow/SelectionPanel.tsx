@@ -2,7 +2,6 @@ import { Box, Button, Group, Paper, Stack, Text } from "@mantine/core";
 import { IconListCheck } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
-import { ExpandableSection } from "../ui/ExpandableSection";
 import type { DatasetMetadata, OpsResult, OpsConfig } from "../../generated";
 import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
 
@@ -67,9 +66,7 @@ export function SelectionPanel ({
                 onChange={(v) => onSettingsChange({ latentVarsModel: v })}
               />
             </Group>
-          </Paper>
-          <ExpandableSection title="OPS fine-tuning">
-            <Stack gap="md">
+            <Group grow>
               <SliderFieldWithTooltip
                 label="Variables percentage"
                 sliderLabel={(v) => `${Math.round(v * 100)} %`}
@@ -90,8 +87,8 @@ export function SelectionPanel ({
                 step={1}
                 onChange={(v) => onSettingsChange({ minVarsModel: v })}
               />
-            </Stack>
-          </ExpandableSection>
+            </Group>
+          </Paper>
 
           <Box>
             <Button
