@@ -276,7 +276,7 @@ pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
 
     let (raw_cv_score, penalized_score) =
         validation_score(x.as_ref(), y.as_ref(), &selected_indices, &config)
-            .unwrap_or((0.0, 0.0));
+            .unwrap_or((f64::NEG_INFINITY, f64::NEG_INFINITY));
 
     let fitness_score = if penalized_score.is_finite() {
         (penalized_score / config.fitness_precision).round() as isize
@@ -485,7 +485,7 @@ mod tests {
 
         assert_eq!(result.selected_count, 0);
         assert!(!result.found_solution);
-        assert_eq!(result.penalized_score, 0.0);
+        assert!(!result.penalized_score.is_finite());
     }
 
     #[test]
