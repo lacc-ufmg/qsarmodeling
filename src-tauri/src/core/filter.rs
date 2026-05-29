@@ -4,9 +4,6 @@ use std::sync::Arc;
 
 use super::loader::RawDataset;
 
-// =============================
-// Filter configuration
-// =============================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterConfig {
@@ -16,9 +13,6 @@ pub struct FilterConfig {
     pub autoscale: bool,
 }
 
-// =============================
-// Column statistics (cached)
-// =============================
 #[derive(Debug, Clone)]
 struct ColumnStats {
     pub mean: f64,
@@ -26,9 +20,6 @@ struct ColumnStats {
     pub std: f64,
 }
 
-// =============================
-// Filter state (core structure)
-// =============================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterState {

@@ -8,15 +8,6 @@
   "permissions": [
     "core:default",
     "opener:default",
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        {
-          "name": "binaries/qsar-backend",
-          "sidecar": true
-        }
-      ]
-    },
     "dialog:default",
     "fs:default"
   ]

@@ -1,8 +1,10 @@
 pub mod core;
+pub mod app;
 pub(crate) mod utils;
 pub mod validation;
 
 use serde::Serialize;
+use app::{commands, session};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,16 +30,16 @@ pub fn run() {
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(core::session::SessionState::new())
+        .manage(session::SessionState::new())
         .invoke_handler(tauri::generate_handler![
             app_info,
-            core::commands::load_dataset_cmd,
-            core::commands::apply_filter_cmd,
-            core::commands::run_selection_cmd,
-            core::commands::run_ga_selection_cmd,
-            core::commands::has_dataset_cmd,
-            core::commands::get_last_filter_result_cmd,
-            core::commands::load_example_dataset_cmd,
+            commands::load_dataset_cmd,
+            commands::apply_filter_cmd,
+            commands::run_selection_cmd,
+            commands::run_ga_selection_cmd,
+            commands::has_dataset_cmd,
+            commands::get_last_filter_result_cmd,
+            commands::load_example_dataset_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

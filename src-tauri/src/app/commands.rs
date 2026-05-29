@@ -5,11 +5,11 @@ use tauri::path::BaseDirectory;
 use tauri::Manager;
 use tauri::State;
 
-use super::ga::{GAConfig, GAResult};
-use super::loader::DatasetMetadata;
-use super::ops::{OpsConfig, OpsResult};
+use crate::core::ga::{GAConfig, GAResult};
+use crate::core::loader::DatasetMetadata;
+use crate::core::ops::{OpsConfig, OpsResult};
 
-use super::filter::{FilterConfig, FilterResult};
+use crate::core::filter::{FilterConfig, FilterResult};
 use super::session::SessionState;
 
 #[tauri::command]

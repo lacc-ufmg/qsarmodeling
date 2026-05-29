@@ -2,12 +2,12 @@ use ndarray::Array2;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use super::ga::{GAConfig, GAResult};
-use super::loader::DatasetMetadata;
-use super::ops::{OpsConfig, OpsResult};
+use crate::core;
+use crate::core::loader::{DatasetMetadata, RawDataset};
+use crate::core::filter::{FilterConfig, FilterPipeline, FilterResult};
+use crate::core::ga::{GAConfig, GAResult};
+use crate::core::ops::{OpsConfig, OpsResult};
 
-use super::filter::{FilterConfig, FilterPipeline, FilterResult};
-use super::loader::RawDataset;
 
 pub struct SessionState {
     inner: Mutex<SessionInner>,
@@ -44,7 +44,7 @@ impl SessionState {
         let y = dataset.y.clone();
 
         // Run OPS
-        let result = super::ops::run_ops(&x, &y, &config);
+        let result = core::ops::run_ops(&x, &y, &config);
         Ok(result)
     }
 
@@ -54,12 +54,12 @@ impl SessionState {
         let x = self.materialize_last_x()?;
         let y = dataset.y.clone();
 
-        let result = super::ga::run_ga(x, y, config);
+        let result = core::ga::run_ga(x, y, config);
         Ok(result)
     }
 
     pub fn load_dataset(&self, x_path: &Path, y_path: &Path) -> Result<DatasetMetadata, String> {
-        let dataset = super::loader::load_dataset(&x_path, &y_path)
+        let dataset = core::loader::load_dataset(&x_path, &y_path)
             .map_err(|e| format!("Failed to load dataset: {}", e))?;
 
         Ok(self.set_dataset(dataset))
@@ -127,6 +127,6 @@ impl SessionState {
             .as_ref()
             .ok_or("No filter result")?;
 
-        Ok(super::filter::materialize(dataset, &result.state))
+        Ok(core::filter::materialize(dataset, &result.state))
     }
 }
