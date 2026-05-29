@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import type {
   DatasetMetadata,
   ExampleDataset,
@@ -9,6 +10,8 @@ import type {
   OpsConfig,
   OpsResult,
 } from "../generated";
+import { GA_PROGRESS_EVENT } from "../generated";
+import type { GAProgressEvent } from "../generated";
 import {
   applyFilterCmd,
   loadDatasetCmd,
@@ -29,6 +32,7 @@ type WorkflowState = {
   isFiltered: boolean;
   selectionMode: SelectionMode;
   selectionResult: SelectionResult | null;
+  gaProgress: GAProgressEvent | null;
   busyState: "idle" | "loading-data" | "filtering" | "selecting";
   error: string | null;
   filterSettings: FilterConfig;
@@ -70,6 +74,7 @@ export function useQsarWorkflow() {
   const [isFiltered, setIsFiltered] = useState(false);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("ops");
   const [selectionResult, setSelectionResult] = useState<SelectionResult | null>(null);
+  const [gaProgress, setGaProgress] = useState<GAProgressEvent | null>(null);
 
   const [busyState, setBusyState] = useState<WorkflowState["busyState"]>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +102,9 @@ export function useQsarWorkflow() {
   const updateSelectionMode = useCallback((mode: SelectionMode) => {
     setSelectionMode(mode);
     setSelectionResult(null);
+    if (mode !== "ga") {
+      setGaProgress(null);
+    }
   }, []);
 
   const updateOpsSelectionSettings = useCallback((patch: Partial<OpsConfig>) => {
@@ -142,6 +150,7 @@ export function useQsarWorkflow() {
       setActiveDataset(meta);
       setIsFiltered(false);
       setSelectionResult(null);
+      setGaProgress(null);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err, "Failed to load dataset."));
@@ -160,6 +169,7 @@ export function useQsarWorkflow() {
       setActiveDataset(meta);
       setIsFiltered(false);
       setSelectionResult(null);
+      setGaProgress(null);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err, "Failed to load example dataset."));
@@ -185,6 +195,7 @@ export function useQsarWorkflow() {
       setActiveDataset(newActive);
       setIsFiltered(true);
       setSelectionResult(null);
+      setGaProgress(null);
       setError(null);
     } catch (err) {
       setError(toErrorMessage(err, "Failed to run descriptor filters."));
@@ -198,6 +209,18 @@ export function useQsarWorkflow() {
 
     try {
       setBusyState("selecting");
+      if (selectionMode === "ga") {
+        setGaProgress({
+          phase: "start",
+          currentGeneration: 0,
+          maxGenerations: gaSelectionSettings.maxGenerations,
+          staleGenerations: 0,
+          bestGeneration: null,
+          progress: 0,
+        });
+      } else {
+        setGaProgress(null);
+      }
       console.log(`Starting ${selectionMode === "ga" ? "GA" : "OPS"} selection...`, {
         selectionMode,
         gaSelectionSettings: selectionMode === "ga" ? gaSelectionSettings : undefined,
@@ -232,6 +255,24 @@ export function useQsarWorkflow() {
     }
   }, [activeDataset, gaSelectionSettings, opsSelectionSettings, selectionMode]);
 
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen<GAProgressEvent>(GA_PROGRESS_EVENT, (event) => {
+      setGaProgress(event.payload);
+    })
+      .then((dispose) => {
+        unlisten = dispose;
+      })
+      .catch((err) => {
+        console.error("Failed to subscribe to GA progress events:", err);
+      });
+
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
   const isIdle = busyState === "idle";
   const canLoadData = Boolean(matrixFilePath && vectorFilePath) && isIdle;
   const canRunFilters = Boolean(activeDataset) && isIdle;
@@ -247,6 +288,7 @@ export function useQsarWorkflow() {
       isFiltered,
       selectionMode,
       selectionResult,
+      gaProgress,
       busyState,
       error,
       filterSettings,
@@ -264,6 +306,7 @@ export function useQsarWorkflow() {
       opsSelectionSettings,
       selectionMode,
       selectionResult,
+      gaProgress,
       uploadedDataset,
       vectorFilePath,
     ],

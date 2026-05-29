@@ -1,10 +1,11 @@
-import { Badge, Box, Button, Group, Paper, SegmentedControl, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Badge, Box, Button, Group, Paper, Progress, SegmentedControl, SimpleGrid, Stack, Text } from "@mantine/core";
 import { IconGauge, IconListCheck, IconSparkles } from "@tabler/icons-react";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import { NumberFieldWithTooltip } from "../ui/NumberFieldWithTooltip";
 import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
 import type { DatasetMetadata, GAConfig, GAResult, OpsConfig, OpsResult } from "../../generated";
+import type { GAProgressEvent } from "../../generated";
 import { StatsRing } from "../ui/StatsRing";
 
 type SelectionMode = "ops" | "ga";
@@ -17,6 +18,7 @@ type SelectionPanelProps = {
   selectionResult: SelectionResult | null;
   opsSelectionSettings: OpsConfig;
   gaSelectionSettings: GAConfig;
+  gaProgress: GAProgressEvent | null;
   isLoading: boolean;
   isDisabled: boolean;
   onSelectionModeChange: (mode: SelectionMode) => void;
@@ -50,6 +52,7 @@ export function SelectionPanel({
   selectionResult,
   opsSelectionSettings,
   gaSelectionSettings,
+  gaProgress,
   isLoading,
   isDisabled,
   onSelectionModeChange,
@@ -285,6 +288,28 @@ export function SelectionPanel({
                   fixedDecimalScale={false}
                 />
               </SimpleGrid>
+            </Paper>
+          )}
+
+          {selectionMode === "ga" && (
+            <Paper p="md" radius="sm">
+              <Group justify="space-between" align="center" mb="xs">
+                <Text size="sm" fw={500}>
+                  GA progress
+                </Text>
+                <Badge variant="light" color="grape">
+                  {gaProgress ? `${Math.round(gaProgress.progress)}%` : "Idle"}
+                </Badge>
+              </Group>
+              <Progress value={gaProgress?.progress ?? 0} size="md" radius="xl" />
+              <Group justify="space-between" mt="xs">
+                <Text size="xs" c="dimmed">
+                  Generation {gaProgress ? gaProgress.currentGeneration + 1 : 0} / {gaProgress?.maxGenerations ?? gaSelectionSettings.maxGenerations}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  Stale {gaProgress?.staleGenerations ?? 0}
+                </Text>
+              </Group>
             </Paper>
           )}
 

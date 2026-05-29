@@ -111,6 +111,7 @@ export default function App () {
               selectionResult={state.selectionResult}
               opsSelectionSettings={state.opsSelectionSettings}
               gaSelectionSettings={state.gaSelectionSettings}
+              gaProgress={state.gaProgress}
               isLoading={state.busyState === "selecting"}
               isDisabled={!selectors.canRunSelection}
               onSelectionModeChange={actions.updateSelectionMode}
