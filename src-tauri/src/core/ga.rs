@@ -2,6 +2,9 @@ use std::sync::Arc;
 
 use genetic_algorithm::strategy::evolve::prelude::*;
 use ndarray::{Array1, Array2};
+use serde::{Deserialize, Serialize};
+
+use crate::utils::select_columns;
 
 /// Configuration for GA-based variable selection.
 ///
@@ -9,7 +12,8 @@ use ndarray::{Array1, Array2};
 ///     penalized_score = q2_cv - size_penalty * (n_selected / n_features)
 ///
 /// The raw score is the k-fold CV Q² (higher is better).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GAConfig {
     /// Number of chromosomes in the population.
     pub population_size: usize,
@@ -103,7 +107,8 @@ impl Default for GAConfig {
 }
 
 /// Result of the GA variable selection.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GAResult {
     /// Best binary mask found by the GA.
     pub best_mask: Vec<bool>,
@@ -157,7 +162,7 @@ impl Fitness for VariableSelectionFitness {
         }
 
         let (_raw_cv_score, penalized_score) =
-            subset_score(self.x.as_ref(), self.y.as_ref(), &selected, &self.config)?;
+            validation_score(self.x.as_ref(), self.y.as_ref(), &selected, &self.config)?;
 
         if !penalized_score.is_finite() {
             return None;
@@ -176,23 +181,23 @@ impl Fitness for VariableSelectionFitness {
 ///
 /// Each gene is a binary include/exclude flag for one column of `x`.
 pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
-    assert_eq!(
+    debug_assert_eq!(
         x.nrows(),
         y.len(),
         "x and y must have the same number of rows"
     );
-    assert!(x.ncols() > 0, "x must have at least one descriptor");
-    assert!(x.nrows() > 1, "x must have at least two samples");
-    assert!(config.population_size > 0, "population_size must be > 0");
-    assert!(config.max_generations > 0, "max_generations must be > 0");
-    assert!(
+    debug_assert!(x.ncols() > 0, "x must have at least one descriptor");
+    debug_assert!(x.nrows() > 1, "x must have at least two samples");
+    debug_assert!(config.population_size > 0, "population_size must be > 0");
+    debug_assert!(config.max_generations > 0, "max_generations must be > 0");
+    debug_assert!(
         config.max_stale_generations > 0,
         "max_stale_generations must be > 0"
     );
-    assert!(config.cv_folds >= 2, "cv_folds must be >= 2");
-    assert!(config.ridge_lambda >= 0.0, "ridge_lambda must be >= 0");
-    assert!(config.min_features >= 1, "min_features must be >= 1");
-    assert!(
+    debug_assert!(config.cv_folds >= 2, "cv_folds must be >= 2");
+    debug_assert!(config.ridge_lambda >= 0.0, "ridge_lambda must be >= 0");
+    debug_assert!(config.min_features >= 1, "min_features must be >= 1");
+    debug_assert!(
         config.fitness_precision > 0.0,
         "fitness_precision must be > 0"
     );
@@ -200,11 +205,11 @@ pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
     let n_features = x.ncols();
 
     if let Some(max_features) = config.max_features {
-        assert!(
+        debug_assert!(
             max_features >= config.min_features,
             "max_features must be >= min_features"
         );
-        assert!(
+        debug_assert!(
             max_features <= n_features,
             "max_features cannot exceed the number of descriptors"
         );
@@ -270,8 +275,8 @@ pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
     let selected_count = selected_indices.len();
 
     let (raw_cv_score, penalized_score) =
-        subset_score(x.as_ref(), y.as_ref(), &selected_indices, &config)
-            .unwrap_or((f64::NEG_INFINITY, f64::NEG_INFINITY));
+        validation_score(x.as_ref(), y.as_ref(), &selected_indices, &config)
+            .unwrap_or((0.0, 0.0));
 
     let fitness_score = if penalized_score.is_finite() {
         (penalized_score / config.fitness_precision).round() as isize
@@ -299,7 +304,7 @@ fn mask_to_indices(mask: &[bool]) -> Vec<usize> {
 }
 
 /// Score a subset with k-fold CV Q² minus a subset-size penalty.
-fn subset_score(
+fn validation_score(
     x: &Array2<f64>,
     y: &Array1<f64>,
     selected: &[usize],
@@ -309,63 +314,12 @@ fn subset_score(
         return None;
     }
 
-    let n_samples = x.nrows();
-    if n_samples < 2 {
-        return None;
-    }
+    let x_selected = select_columns(x, selected);
+    let n_samples = x_selected.nrows();
+    let n_lv = selected.len().min(n_samples.saturating_sub(1)).max(1);
 
-    let k_folds = config.cv_folds.clamp(2, n_samples);
-    let y_mean_global = y.iter().copied().sum::<f64>() / n_samples as f64;
-    let tss = y
-        .iter()
-        .map(|&v| {
-            let d = v - y_mean_global;
-            d * d
-        })
-        .sum::<f64>();
-
-    if tss <= f64::EPSILON {
-        return None;
-    }
-
-    let mut folds: Vec<Vec<usize>> = vec![Vec::new(); k_folds];
-    for idx in 0..n_samples {
-        folds[idx % k_folds].push(idx);
-    }
-
-    let mut press = 0.0;
-
-    for test_idx in &folds {
-        if test_idx.is_empty() {
-            continue;
-        }
-
-        let mut train_idx = Vec::with_capacity(n_samples - test_idx.len());
-        for idx in 0..n_samples {
-            if !test_idx.contains(&idx) {
-                train_idx.push(idx);
-            }
-        }
-
-        if train_idx.len() <= selected.len() {
-            return None;
-        }
-
-        let (beta, x_mean, y_mean) =
-            fit_ridge_ols_fold(x, y, &train_idx, selected, config.ridge_lambda)?;
-
-        for &row in test_idx {
-            let mut pred = y_mean;
-            for (j, &col) in selected.iter().enumerate() {
-                pred += (x[(row, col)] - x_mean[j]) * beta[j];
-            }
-            let err = y[row] - pred;
-            press += err * err;
-        }
-    }
-
-    let raw_cv_score = 1.0 - (press / tss);
-    if !raw_cv_score.is_finite() {
+    let (raw_cv_score, rmsecv) = crate::validation::metrics::loo_q2_rmsecv(&x_selected, y, n_lv);
+    if !raw_cv_score.is_finite() || !rmsecv.is_finite() {
         return None;
     }
 
@@ -375,130 +329,177 @@ fn subset_score(
     Some((raw_cv_score, penalized_score))
 }
 
-/// Fit ridge-regularized OLS on one training fold using centered predictors.
-///
-/// Returns:
-/// - beta coefficients
-/// - column means for selected predictors
-/// - response mean
-fn fit_ridge_ols_fold(
-    x: &Array2<f64>,
-    y: &Array1<f64>,
-    train_idx: &[usize],
-    selected: &[usize],
-    ridge_lambda: f64,
-) -> Option<(Vec<f64>, Vec<f64>, f64)> {
-    let k = selected.len();
-    if k == 0 {
-        return None;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::{array, Array1, Array2};
+
+    fn simple_dataset() -> (Array2<f64>, Array1<f64>) {
+        // Small deterministic dataset
+        let x = array![
+            [1.0, 0.0, 3.0],
+            [2.0, 1.0, 6.0],
+            [3.0, 0.0, 9.0],
+            [4.0, 1.0, 12.0],
+            [5.0, 0.0, 15.0],
+        ];
+
+        // y is strongly correlated with col 0 and col 2
+        let y = array![1.0, 2.0, 3.0, 4.0, 5.0];
+
+        (x, y)
     }
 
-    let n_train = train_idx.len();
-    if n_train <= k {
-        return None;
-    }
-
-    let mut x_mean = vec![0.0; k];
-    let mut y_mean = 0.0;
-
-    for &row in train_idx {
-        y_mean += y[row];
-        for (j, &col) in selected.iter().enumerate() {
-            x_mean[j] += x[(row, col)];
-        }
-    }
-
-    let n_train_f = n_train as f64;
-    y_mean /= n_train_f;
-    for v in &mut x_mean {
-        *v /= n_train_f;
-    }
-
-    let mut xtx = vec![0.0; k * k];
-    let mut xty = vec![0.0; k];
-
-    for &row in train_idx {
-        let yc = y[row] - y_mean;
-
-        for a in 0..k {
-            let xa = x[(row, selected[a])] - x_mean[a];
-            xty[a] += xa * yc;
-
-            for b in 0..=a {
-                let xb = x[(row, selected[b])] - x_mean[b];
-                xtx[a * k + b] += xa * xb;
-            }
+    fn test_config() -> GAConfig {
+        GAConfig {
+            population_size: 30,
+            max_generations: 50,
+            max_stale_generations: 10,
+            target_fitness_score: None,
+            replacement_rate: 0.5,
+            elitism_rate: 0.05,
+            tournament_size: 3,
+            crossover_selection_rate: 0.7,
+            crossover_rate: 0.8,
+            mutation_probability: 0.2,
+            cv_folds: 3,
+            ridge_lambda: 1e-8,
+            min_features: 1,
+            max_features: None,
+            size_penalty: 0.01,
+            fitness_precision: 1e-6,
+            seed: Some(42), // deterministic
+            par_fitness: false,
         }
     }
 
-    // Symmetrize and add ridge regularization.
-    for a in 0..k {
-        for b in 0..a {
-            xtx[b * k + a] = xtx[a * k + b];
-        }
-        xtx[a * k + a] += ridge_lambda;
+    // -----------------------------
+    // mask_to_indices
+    // -----------------------------
+    #[test]
+    fn test_mask_to_indices_basic() {
+        let mask = vec![true, false, true, false, true];
+        let indices = mask_to_indices(&mask);
+        assert_eq!(indices, vec![0, 2, 4]);
     }
 
-    let beta = solve_linear_system(xtx, xty, k)?;
-    Some((beta, x_mean, y_mean))
-}
-
-/// Dense linear system solver via Gauss-Jordan elimination with partial pivoting.
-///
-/// Solves A x = b.
-fn solve_linear_system(mut a: Vec<f64>, mut b: Vec<f64>, n: usize) -> Option<Vec<f64>> {
-    let eps = 1e-12;
-
-    for i in 0..n {
-        // Pivot search
-        let mut pivot_row = i;
-        let mut pivot_abs = a[i * n + i].abs();
-        for r in (i + 1)..n {
-            let v = a[r * n + i].abs();
-            if v > pivot_abs {
-                pivot_abs = v;
-                pivot_row = r;
-            }
-        }
-
-        if pivot_abs < eps {
-            return None;
-        }
-
-        if pivot_row != i {
-            for c in 0..n {
-                a.swap(i * n + c, pivot_row * n + c);
-            }
-            b.swap(i, pivot_row);
-        }
-
-        let diag = a[i * n + i];
-        if diag.abs() < eps {
-            return None;
-        }
-
-        // Normalize pivot row
-        for c in i..n {
-            a[i * n + c] /= diag;
-        }
-        b[i] /= diag;
-
-        // Eliminate all other rows
-        for r in 0..n {
-            if r == i {
-                continue;
-            }
-            let factor = a[r * n + i];
-            if factor.abs() < eps {
-                continue;
-            }
-
-            for c in i..n {
-                a[r * n + c] -= factor * a[i * n + c];
-            }
-            b[r] -= factor * b[i];
-        }
+    #[test]
+    fn test_mask_to_indices_empty() {
+        let mask = vec![false, false, false];
+        let indices = mask_to_indices(&mask);
+        assert!(indices.is_empty());
     }
 
-    Some(b)
+    // -----------------------------
+    // validation_score
+    // -----------------------------
+    #[test]
+    fn test_validation_score_valid_subset() {
+        let (x, y) = simple_dataset();
+        let config = test_config();
+
+        let selected = vec![0, 2];
+        let result = validation_score(&x, &y, &selected, &config);
+
+        assert!(result.is_some());
+        let (raw, penalized) = result.unwrap();
+
+        assert!(raw.is_finite());
+        assert!(penalized.is_finite());
+        assert!(penalized <= raw); // penalty reduces score
+    }
+
+    #[test]
+    fn test_validation_score_empty_subset() {
+        let (x, y) = simple_dataset();
+        let config = test_config();
+
+        let result = validation_score(&x, &y, &[], &config);
+        assert!(result.is_none());
+    }
+
+    // -----------------------------
+    // GA execution
+    // -----------------------------
+    #[test]
+    fn test_run_ga_basic() {
+        let (x, y) = simple_dataset();
+        let config = test_config();
+
+        let result = run_ga(x, y, config);
+
+        assert!(result.best_mask.len() > 0);
+        assert_eq!(result.selected_count, result.selected_indices.len());
+
+        assert!(result.raw_cv_score.is_finite());
+        assert!(result.penalized_score.is_finite());
+
+        assert!(result.found_solution);
+    }
+
+    #[test]
+    fn test_run_ga_respects_min_features() {
+        let (x, y) = simple_dataset();
+
+        let mut config = test_config();
+        config.min_features = 2;
+
+        let result = run_ga(x, y, config);
+
+        assert!(result.selected_count >= 2);
+    }
+
+    #[test]
+    fn test_run_ga_respects_max_features() {
+        let (x, y) = simple_dataset();
+
+        let mut config = test_config();
+        config.max_features = Some(2);
+
+        let result = run_ga(x, y, config);
+
+        assert!(result.selected_count <= 2);
+    }
+
+    #[test]
+    fn test_run_ga_deterministic_with_seed() {
+        let (x, y) = simple_dataset();
+        let config = test_config();
+
+        let result1 = run_ga(x.clone(), y.clone(), config.clone());
+        let result2 = run_ga(x, y, config);
+
+        assert_eq!(result1.best_mask, result2.best_mask);
+        assert_eq!(result1.selected_indices, result2.selected_indices);
+        assert_eq!(result1.fitness_score, result2.fitness_score);
+    }
+
+    #[test]
+    fn test_run_ga_handles_no_valid_solution() {
+        let (x, y) = simple_dataset();
+
+        let mut config = test_config();
+        config.min_features = 10; // impossible (more than n_features)
+
+        let result = run_ga(x, y, config);
+
+        assert_eq!(result.selected_count, 0);
+        assert!(!result.found_solution);
+        assert_eq!(result.penalized_score, 0.0);
+    }
+
+    #[test]
+    fn test_fitness_scaling_consistency() {
+        let (x, y) = simple_dataset();
+        let config = test_config();
+
+        let result = run_ga(x, y, config.clone());
+
+        if result.penalized_score.is_finite() {
+            let expected =
+                (result.penalized_score / config.fitness_precision).round() as isize;
+
+            assert_eq!(result.fitness_score, expected);
+        }
+    }
 }

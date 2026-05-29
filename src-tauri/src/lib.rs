@@ -34,6 +34,7 @@ pub fn run() {
             core::commands::load_dataset_cmd,
             core::commands::apply_filter_cmd,
             core::commands::run_selection_cmd,
+            core::commands::run_ga_selection_cmd,
             core::commands::has_dataset_cmd,
             core::commands::get_last_filter_result_cmd,
             core::commands::load_example_dataset_cmd,

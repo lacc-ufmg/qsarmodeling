@@ -9,6 +9,8 @@ type NumberFieldWithTooltipProps = {
   max: number;
   step: number;
   onChange: (value: number) => void;
+  decimalScale?: number;
+  fixedDecimalScale?: boolean;
 };
 
 export function NumberFieldWithTooltip({
@@ -19,6 +21,8 @@ export function NumberFieldWithTooltip({
   max,
   step,
   onChange,
+  decimalScale = 2,
+  fixedDecimalScale = true,
 }: NumberFieldWithTooltipProps) {
   return (
     <NumberInput
@@ -32,8 +36,8 @@ export function NumberFieldWithTooltip({
       min={min}
       max={max}
       step={step}
-      decimalScale={2}
-      fixedDecimalScale
+      decimalScale={decimalScale}
+      fixedDecimalScale={fixedDecimalScale}
       allowedDecimalSeparators={[".", ","]}
       onChange={(val) => onChange(Number(val) || 0)}
     />

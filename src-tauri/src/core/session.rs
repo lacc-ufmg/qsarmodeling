@@ -2,6 +2,7 @@ use ndarray::Array2;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use super::ga::{GAConfig, GAResult};
 use super::loader::DatasetMetadata;
 use super::ops::{OpsConfig, OpsResult};
 
@@ -44,6 +45,16 @@ impl SessionState {
 
         // Run OPS
         let result = super::ops::run_ops(&x, &y, &config);
+        Ok(result)
+    }
+
+    pub fn run_ga(&self, config: GAConfig) -> Result<GAResult, String> {
+        let dataset = self.get_dataset().ok_or("No dataset loaded")?;
+
+        let x = self.materialize_last_x()?;
+        let y = dataset.y.clone();
+
+        let result = super::ga::run_ga(x, y, config);
         Ok(result)
     }
 

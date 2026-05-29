@@ -107,11 +107,15 @@ export default function App () {
 
             <SelectionPanel
               activeDataset={state.activeDataset}
+              selectionMode={state.selectionMode}
               selectionResult={state.selectionResult}
-              selectionSettings={state.selectionSettings}
+              opsSelectionSettings={state.opsSelectionSettings}
+              gaSelectionSettings={state.gaSelectionSettings}
               isLoading={state.busyState === "selecting"}
               isDisabled={!selectors.canRunSelection}
-              onSettingsChange={actions.updateSelectionSettings}
+              onSelectionModeChange={actions.updateSelectionMode}
+              onOpsSettingsChange={actions.updateOpsSelectionSettings}
+              onGaSettingsChange={actions.updateGaSelectionSettings}
               onRunSelection={actions.runVariableSelection}
             />
           </Stack>

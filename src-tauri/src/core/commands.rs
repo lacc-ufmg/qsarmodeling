@@ -5,6 +5,7 @@ use tauri::path::BaseDirectory;
 use tauri::Manager;
 use tauri::State;
 
+use super::ga::{GAConfig, GAResult};
 use super::loader::DatasetMetadata;
 use super::ops::{OpsConfig, OpsResult};
 
@@ -34,6 +35,14 @@ pub async fn run_selection_cmd(
     settings: OpsConfig,
 ) -> Result<OpsResult, String> {
     state.run_ops(settings)
+}
+
+#[tauri::command]
+pub async fn run_ga_selection_cmd(
+    state: State<'_, SessionState>,
+    settings: GAConfig,
+) -> Result<GAResult, String> {
+    state.run_ga(settings)
 }
 
 #[tauri::command]
