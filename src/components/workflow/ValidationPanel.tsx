@@ -1,5 +1,7 @@
-import { Button, Checkbox, Group, Paper, Stack, Text } from "@mantine/core";
-import { IconListCheck, IconPlayerPlay } from "@tabler/icons-react";
+import { Alert, Button, Checkbox, Group, Paper, Stack, Text } from "@mantine/core";
+import { IconListCheck, IconPlayerPlay, IconAlertCircle } from "@tabler/icons-react";
+import { useCallback, useState } from "react";
+import { useWorkflowContext } from "../contexts/WorkflowContext";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import { ExpandableSection } from "../ui/ExpandableSection";
@@ -32,33 +34,75 @@ type ValidationSettings = {
   testSetRatio: number;
 };
 
-type ValidationPanelProps = {
-  selectionResult: boolean;
-  validationResult: ValidationResult | null;
-  validationSettings: ValidationSettings;
-  isLoading: boolean;
-  isValidating: boolean;
-  isPipelineRunning: boolean;
-  isDisabled: boolean;
-  canRunPipeline: boolean;
-  onSettingsChange: (patch: Partial<ValidationSettings>) => void;
-  onRunValidation: () => void;
-  onRunPipeline: () => void;
-};
+export function ValidationPanel() {
+  const { activeDataset, globalBusyState, setGlobalBusyState } = useWorkflowContext();
 
-export function ValidationPanel({
-  selectionResult,
-  validationResult,
-  validationSettings,
-  isLoading: _isLoading,
-  isValidating,
-  isPipelineRunning,
-  isDisabled,
-  canRunPipeline,
-  onSettingsChange,
-  onRunValidation,
-  onRunPipeline,
-}: ValidationPanelProps) {
+  const [validationSettings, setValidationSettings] = useState<ValidationSettings>({
+    runCrossValidation: true,
+    runYRandomization: true,
+    runLNO: true,
+    runExternalValidation: false,
+    yrandCutoff: 0.05,
+    lnoCutoff: 0.1,
+    testSetRatio: 0.2,
+  });
+
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [isPipelineRunning, setIsPipelineRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const updateSettings = useCallback((patch: Partial<ValidationSettings>) => {
+    setValidationSettings((s) => ({ ...s, ...patch }));
+  }, []);
+
+  const runValidation = useCallback(async () => {
+    if (!activeDataset) return;
+
+    try {
+      setIsValidating(true);
+      setGlobalBusyState("validating");
+
+      // TODO: Implement actual validation command when backend is ready
+      // For now, scaffold with mock result to demonstrate flow
+      const mockResult: ValidationResult = {
+        cv: { q2: 0.0 },
+        yr: { score: 0.0, passed: false },
+        lno: { score: 0.0, passed: false },
+        ext: { r2Pred: 0.0 },
+      };
+      setValidationResult(mockResult);
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to run validation.";
+      setError(message);
+    } finally {
+      setIsValidating(false);
+      setGlobalBusyState("idle");
+    }
+  }, [activeDataset, validationSettings, setGlobalBusyState]);
+
+  const runPipeline = useCallback(async () => {
+    if (!activeDataset) return;
+
+    try {
+      setIsPipelineRunning(true);
+
+      // TODO: Implement actual pipeline execution when backend is ready
+      console.log("Running full pipeline");
+
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to run pipeline.";
+      setError(message);
+    } finally {
+      setIsPipelineRunning(false);
+    }
+  }, [activeDataset]);
+
+  const isDisabled = globalBusyState !== "idle";
+  const selectionResult = Boolean(activeDataset); // Placeholder; actual value would come from SelectionPanel
+  const canRunPipeline = false; // TODO: Update when pipeline conditions are defined
   return (
     <StepCard
       step={4}
@@ -68,6 +112,11 @@ export function ValidationPanel({
       disabled={isDisabled}
       futurePreview
     >
+      {error && (
+        <Alert icon={<IconAlertCircle size="1rem" />} color="red">
+          {error}
+        </Alert>
+      )}
       {selectionResult ? (
         <Stack>
           <Paper p="md" radius="sm">
@@ -79,26 +128,26 @@ export function ValidationPanel({
                 label="Cross validation"
                 checked={validationSettings.runCrossValidation}
                 onChange={(e) =>
-                  onSettingsChange({ runCrossValidation: e.currentTarget.checked })
+                  updateSettings({ runCrossValidation: e.currentTarget.checked })
                 }
               />
               <Checkbox
                 label="Y-randomization"
                 checked={validationSettings.runYRandomization}
                 onChange={(e) =>
-                  onSettingsChange({ runYRandomization: e.currentTarget.checked })
+                  updateSettings({ runYRandomization: e.currentTarget.checked })
                 }
               />
               <Checkbox
                 label="Leave-N-Out"
                 checked={validationSettings.runLNO}
-                onChange={(e) => onSettingsChange({ runLNO: e.currentTarget.checked })}
+                onChange={(e) => updateSettings({ runLNO: e.currentTarget.checked })}
               />
               <Checkbox
                 label="External validation"
                 checked={validationSettings.runExternalValidation}
                 onChange={(e) =>
-                  onSettingsChange({ runExternalValidation: e.currentTarget.checked })
+                  updateSettings({ runExternalValidation: e.currentTarget.checked })
                 }
               />
             </Group>
@@ -113,7 +162,7 @@ export function ValidationPanel({
                 min={0}
                 max={1}
                 step={0.01}
-                onChange={(v) => onSettingsChange({ yrandCutoff: v })}
+                onChange={(v) => updateSettings({ yrandCutoff: v })}
               />
               <NumberFieldWithTooltip
                 label="LNO cutoff"
@@ -122,7 +171,7 @@ export function ValidationPanel({
                 min={0}
                 max={1}
                 step={0.01}
-                onChange={(v) => onSettingsChange({ lnoCutoff: v })}
+                onChange={(v) => updateSettings({ lnoCutoff: v })}
               />
               <NumberFieldWithTooltip
                 label="Test set ratio"
@@ -131,14 +180,14 @@ export function ValidationPanel({
                 min={0.1}
                 max={0.5}
                 step={0.01}
-                onChange={(v) => onSettingsChange({ testSetRatio: v })}
+                onChange={(v) => updateSettings({ testSetRatio: v })}
               />
             </Group>
           </ExpandableSection>
 
           <Group mt="md">
             <Button
-              onClick={onRunValidation}
+              onClick={runValidation}
               disabled={isDisabled}
               loading={isValidating}
               variant="default"
@@ -147,7 +196,7 @@ export function ValidationPanel({
               Run validation
             </Button>
             <Button
-              onClick={onRunPipeline}
+              onClick={runPipeline}
               disabled={!canRunPipeline}
               loading={isPipelineRunning}
               color="orange"

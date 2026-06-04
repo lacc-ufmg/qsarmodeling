@@ -6,7 +6,7 @@ import { ResultCard } from "../ui/ResultCard";
 import { StatsRing } from "../ui/StatsRing";
 import type { GAConfig, GAResult } from "../../generated";
 import { runGaSelectionCmd } from "../../generated";
-import { useWorkflowContext } from "./WorkflowContext";
+import { useWorkflowContext } from "../contexts/WorkflowContext";
 
 const DEFAULT_GA_SETTINGS: GAConfig = {
   populationSize: 100,

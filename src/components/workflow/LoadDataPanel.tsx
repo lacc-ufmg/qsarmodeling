@@ -1,43 +1,92 @@
-import { Box, Button, Group, Stack, Text, Menu } from "@mantine/core";
-import { IconDatabase, IconUpload, IconLayoutRows, IconLayoutColumns, IconX, IconChevronDown } from "@tabler/icons-react";
+import { Alert, Box, Button, Group, Stack, Text, Menu } from "@mantine/core";
+import { IconDatabase, IconUpload, IconLayoutRows, IconLayoutColumns, IconX, IconChevronDown, IconAlertCircle } from "@tabler/icons-react";
+import { useCallback, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { loadDatasetCmd, loadExampleDatasetCmd, type ExampleDataset } from "../../generated";
+import { useWorkflowContext } from "../contexts/WorkflowContext";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
-import type { DatasetMetadata } from "../../generated";
-import { ExampleDataset } from "../../generated";
 import { TooltipLabel } from "../ui/HelpTooltip";
 import { StatsRing } from "../ui/StatsRing";
-
-type LoadDataPanelProps = {
-  matrixFilePath: string | null;
-  vectorFilePath: string | null;
-  uploadedDataset: DatasetMetadata | null;
-  isLoading: boolean;
-  isDisabled: boolean;
-  onSelectMatrixFile: () => void;
-  onSelectVectorFile: () => void;
-  onClearMatrixFile: () => void;
-  onClearVectorFile: () => void;
-  onLoad: () => void;
-  onLoadExample?: (name: ExampleDataset) => void;
-};
 
 function getFileName(filePath: string): string {
   return filePath.split(/[\\/]/).pop() || filePath;
 }
 
-export function LoadDataPanel ({
-  matrixFilePath,
-  vectorFilePath,
-  uploadedDataset,
-  isLoading,
-  isDisabled,
-  onSelectMatrixFile,
-  onSelectVectorFile,
-  onClearMatrixFile,
-  onClearVectorFile,
-  onLoad,
-  onLoadExample,
-}: LoadDataPanelProps) {
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+export function LoadDataPanel() {
+  const { uploadedDataset, setUploadedDataset, setActiveDataset, globalBusyState, setGlobalBusyState } = useWorkflowContext();
+
+  const [matrixFilePath, setMatrixFilePath] = useState<string | null>(null);
+  const [vectorFilePath, setVectorFilePath] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const selectMatrixFile = useCallback(async () => {
+    try {
+      const selected = await open({ multiple: false, filters: [{ name: "CSV", extensions: ["csv"] }] });
+      if (selected && typeof selected === "string") setMatrixFilePath(selected);
+    } catch (err) {
+      setError(toErrorMessage(err, "Failed to select matrix file."));
+    }
+  }, []);
+
+  const selectVectorFile = useCallback(async () => {
+    try {
+      const selected = await open({ multiple: false, filters: [{ name: "CSV", extensions: ["csv"] }] });
+      if (selected && typeof selected === "string") setVectorFilePath(selected);
+    } catch (err) {
+      setError(toErrorMessage(err, "Failed to select vector file."));
+    }
+  }, []);
+
+  const clearMatrixFile = useCallback(() => setMatrixFilePath(null), []);
+  const clearVectorFile = useCallback(() => setVectorFilePath(null), []);
+
+  const loadData = useCallback(async () => {
+    if (!matrixFilePath || !vectorFilePath) {
+      setError("Select both X matrix and y vector files before loading.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setGlobalBusyState("loading-data");
+      const meta = await loadDatasetCmd({ xPath: matrixFilePath, yPath: vectorFilePath });
+
+      setUploadedDataset(meta);
+      setActiveDataset(meta);
+      setError(null);
+    } catch (err) {
+      setError(toErrorMessage(err, "Failed to load dataset."));
+    } finally {
+      setIsLoading(false);
+      setGlobalBusyState("idle");
+    }
+  }, [matrixFilePath, vectorFilePath, setUploadedDataset, setActiveDataset, setGlobalBusyState]);
+
+  const loadExample = useCallback(async (name: ExampleDataset) => {
+    try {
+      setIsLoading(true);
+      setGlobalBusyState("loading-data");
+
+      const meta = await loadExampleDatasetCmd({ dataset: name });
+
+      setUploadedDataset(meta);
+      setActiveDataset(meta);
+      setError(null);
+    } catch (err) {
+      setError(toErrorMessage(err, "Failed to load example dataset."));
+    } finally {
+      setIsLoading(false);
+      setGlobalBusyState("idle");
+    }
+  }, [setUploadedDataset, setActiveDataset, setGlobalBusyState]);
+
+  const isDisabled = globalBusyState !== "idle";
   return (
     <StepCard
       step={1}
@@ -47,6 +96,11 @@ export function LoadDataPanel ({
       disabled={isDisabled && Boolean(uploadedDataset)}
     >
       <Stack>
+        {error && (
+          <Alert icon={<IconAlertCircle size="1rem" />} color="red">
+            {error}
+          </Alert>
+        )}
         <Group grow>
           <Stack gap="xs">
             <div>
@@ -57,7 +111,7 @@ export function LoadDataPanel ({
             </div>
             <Group gap="xs">
               <Button
-                onClick={onSelectMatrixFile}
+                onClick={selectMatrixFile}
                 variant="light"
                 leftSection={<IconUpload size="1rem" />}
                 flex={1}
@@ -66,7 +120,7 @@ export function LoadDataPanel ({
               </Button>
               {matrixFilePath && (
                 <Button
-                  onClick={onClearMatrixFile}
+                  onClick={clearMatrixFile}
                   variant="subtle"
                   color="red"
                   size="xs"
@@ -89,7 +143,7 @@ export function LoadDataPanel ({
             </div>
             <Group gap="xs">
               <Button
-                onClick={onSelectVectorFile}
+                onClick={selectVectorFile}
                 variant="light"
                 leftSection={<IconUpload size="1rem" />}
                 flex={1}
@@ -98,7 +152,7 @@ export function LoadDataPanel ({
               </Button>
               {vectorFilePath && (
                 <Button
-                  onClick={onClearVectorFile}
+                  onClick={clearVectorFile}
                   variant="subtle"
                   color="red"
                   size="xs"
@@ -116,7 +170,7 @@ export function LoadDataPanel ({
         <Box>
           <Group>
             <Button
-              onClick={onLoad}
+              onClick={loadData}
               disabled={isDisabled || !matrixFilePath || !vectorFilePath}
               loading={isLoading}
               leftSection={<IconDatabase size="1rem" />}
@@ -131,13 +185,13 @@ export function LoadDataPanel ({
                 </Button>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Item onClick={() => onLoadExample?.("Dream")}>
+                <Menu.Item onClick={() => loadExample("Dream")}>
                   Dream
                 </Menu.Item>
-                <Menu.Item onClick={() => onLoadExample?.("Carbox")}>
+                <Menu.Item onClick={() => loadExample("Carbox")}>
                   Carbox
                 </Menu.Item>
-                <Menu.Item onClick={() => onLoadExample?.("CarboxBig")}>
+                <Menu.Item onClick={() => loadExample("CarboxBig")}>
                   Carbox (big)
                 </Menu.Item>
               </Menu.Dropdown>

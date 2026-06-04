@@ -1,42 +1,76 @@
-import { Box, Button, Checkbox, Paper, Stack, Text } from "@mantine/core";
-import { IconFilter, IconX, IconCheck } from "@tabler/icons-react";
+import { Alert, Box, Button, Checkbox, Paper, Stack, Text } from "@mantine/core";
+import { IconFilter, IconX, IconCheck, IconAlertCircle } from "@tabler/icons-react";
+import { useCallback, useState } from "react";
+import { applyFilterCmd, type FilterConfig, type DatasetMetadata } from "../../generated";
+import { useWorkflowContext } from "../contexts/WorkflowContext";
 import { StepCard } from "../ui/StepCard";
 import { ResultCard } from "../ui/ResultCard";
 import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
-import type { DatasetMetadata, FilterConfig } from "../../generated";
 import { StatsRing } from "../ui/StatsRing";
 
-type FilterPanelProps = {
-  uploadedDataset: DatasetMetadata | null;
-  activeDataset: DatasetMetadata | null;
-  filterSettings: FilterConfig;
-  isFiltered: boolean;
-  isLoading: boolean;
-  isDisabled: boolean;
-  onSettingsChange: (patch: Partial<FilterConfig>) => void;
-  onRunFilters: () => void;
-};
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
 
-export function FilterPanel ({
-  uploadedDataset,
-  activeDataset,
-  filterSettings,
-  isFiltered,
-  isLoading,
-  isDisabled,
-  onSettingsChange,
-  onRunFilters,
-}: FilterPanelProps) {
-  const isComplete = isFiltered;
+export function FilterPanel() {
+  const { uploadedDataset, activeDataset, globalBusyState, setActiveDataset, setGlobalBusyState } = useWorkflowContext();
+
+  const [filterSettings, setFilterSettings] = useState<FilterConfig>({
+    varianceCut: 0.3,
+    correlationCut: 0.25,
+    autocorrelationCut: 0.85,
+    autoscale: true,
+  });
+
+  const [isFiltered, setIsFiltered] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const updateSettings = useCallback((patch: Partial<FilterConfig>) => {
+    setFilterSettings((s) => ({ ...s, ...patch }));
+  }, []);
+
+  const runFilters = useCallback(async () => {
+    if (!uploadedDataset) return;
+
+    try {
+      setIsLoading(true);
+      setGlobalBusyState("filtering");
+
+      const result = await applyFilterCmd({ config: filterSettings });
+      const descriptors = result.state.kept.length;
+
+      const newActive: DatasetMetadata = {
+        ...uploadedDataset,
+        n_features: descriptors,
+      };
+
+      setActiveDataset(newActive);
+      setIsFiltered(true);
+      setError(null);
+    } catch (err) {
+      setError(toErrorMessage(err, "Failed to run descriptor filters."));
+    } finally {
+      setIsLoading(false);
+      setGlobalBusyState("idle");
+    }
+  }, [uploadedDataset, filterSettings, setActiveDataset, setGlobalBusyState]);
+
+  const isDisabled = globalBusyState !== "idle";
 
   return (
     <StepCard
       step={2}
       title="Filter descriptors"
       description="Remove noisy variables before model selection"
-      isComplete={isComplete}
+      isComplete={isFiltered}
       disabled={isDisabled}
     >
+      {error && (
+        <Alert icon={<IconAlertCircle size="1rem" />} color="red">
+          {error}
+        </Alert>
+      )}
       {uploadedDataset ? (
         <Stack>
           <Paper p="md" radius="sm">
@@ -52,7 +86,7 @@ export function FilterPanel ({
                 min={0}
                 max={1}
                 step={0.01}
-                onChange={(v) => onSettingsChange({ varianceCut: v })}
+                onChange={(v) => updateSettings({ varianceCut: v })}
               />
 
               <SliderFieldWithTooltip
@@ -63,7 +97,7 @@ export function FilterPanel ({
                 min={0}
                 max={1}
                 step={0.01}
-                onChange={(v) => onSettingsChange({ correlationCut: v })}
+                onChange={(v) => updateSettings({ correlationCut: v })}
               />
 
               <SliderFieldWithTooltip
@@ -73,7 +107,7 @@ export function FilterPanel ({
                 min={0}
                 max={1}
                 step={0.01}
-                onChange={(v) => onSettingsChange({ autocorrelationCut: v })}
+                onChange={(v) => updateSettings({ autocorrelationCut: v })}
               />
             </Box>
           </Paper>
@@ -89,13 +123,13 @@ export function FilterPanel ({
                   </Text>
                 }
                 checked={filterSettings.autoscale}
-                onChange={(e) => onSettingsChange({ autoscale: e.currentTarget.checked })}
+                onChange={(e) => updateSettings({ autoscale: e.currentTarget.checked })}
               />
             </Stack>
 
           <Box>
             <Button
-              onClick={onRunFilters}
+              onClick={runFilters}
               disabled={isDisabled}
               loading={isLoading}
               variant="default"
@@ -111,7 +145,7 @@ export function FilterPanel ({
         </Text>
       )}
 
-      {uploadedDataset && activeDataset && isComplete && (
+      {uploadedDataset && activeDataset && isFiltered && (
         <ResultCard title="Filters applied successfully">
           <StatsRing stats={[
             {

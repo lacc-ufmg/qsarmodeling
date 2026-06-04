@@ -1,12 +1,14 @@
 import { createContext, useContext, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import type { DatasetMetadata } from "../../generated";
 
-export type GlobalBusyState = "idle" | "loading-data" | "filtering" | "selecting";
+export type GlobalBusyState = "idle" | "loading-data" | "filtering" | "selecting" | "validating";
 
-type WorkflowContextValue = {
+export type WorkflowContextValue = {
   uploadedDataset: DatasetMetadata | null;
   activeDataset: DatasetMetadata | null;
   globalBusyState: GlobalBusyState;
+  setUploadedDataset: Dispatch<SetStateAction<DatasetMetadata | null>>;
+  setActiveDataset: Dispatch<SetStateAction<DatasetMetadata | null>>;
   setGlobalBusyState: Dispatch<SetStateAction<GlobalBusyState>>;
 };
 

@@ -5,7 +5,7 @@ import { ResultCard } from "../ui/ResultCard";
 import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
 import type { OpsConfig, OpsResult } from "../../generated";
 import { runSelectionCmd } from "../../generated";
-import { useWorkflowContext } from "./WorkflowContext";
+import { useWorkflowContext } from "../contexts/WorkflowContext";
 
 const DEFAULT_OPS_SETTINGS: OpsConfig = {
   latentVarsOps: 3,

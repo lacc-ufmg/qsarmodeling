@@ -1,6 +1,5 @@
 import { useMantineColorScheme } from "@mantine/core";
 import {
-  Alert,
   AppShell,
   Box,
   Container,
@@ -9,21 +8,24 @@ import {
   Text,
   Title
 } from "@mantine/core";
-import { IconAlertCircle } from "@tabler/icons-react";
-import { useQsarWorkflow } from "./hooks/useQsarWorkflow";
 import { ColorSchemeToggle } from "./components/ui/ColorSchemeToggle";
 import { LoadDataPanel } from "./components/workflow/LoadDataPanel";
 import { FilterPanel } from "./components/workflow/FilterPanel";
 import { SelectionPanel } from "./components/workflow/SelectionPanel";
-import { WorkflowProvider } from "./components/workflow/WorkflowContext";
+import { ValidationPanel } from "./components/workflow/ValidationPanel";
+import { WorkflowProvider, type GlobalBusyState, type WorkflowContextValue } from "./components/contexts/WorkflowContext";
 import icon from "./assets/icon.png";
-import { useState, useEffect } from "react";
-import { appInfo } from "./generated";
+import { useState, useEffect, useMemo } from "react";
+import { appInfo, type DatasetMetadata } from "./generated";
 
 export default function App () {
   const { toggleColorScheme } = useMantineColorScheme();
-  const { state, actions, selectors, workflowContext } = useQsarWorkflow();
   const [version, setVersion] = useState("0.x.x");
+
+  // Global shared state managed at App level
+  const [uploadedDataset, setUploadedDataset] = useState<DatasetMetadata | null>(null);
+  const [activeDataset, setActiveDataset] = useState<DatasetMetadata | null>(null);
+  const [globalBusyState, setGlobalBusyState] = useState<GlobalBusyState>("idle");
 
   useEffect(() => {
     appInfo()
@@ -32,6 +34,19 @@ export default function App () {
         console.error("Failed to get app version:", err);
       });
   }, []);
+
+  // Create context value for WorkflowProvider
+  const workflowContextValue = useMemo<WorkflowContextValue>(
+    () => ({
+      uploadedDataset,
+      activeDataset,
+      globalBusyState,
+      setUploadedDataset,
+      setActiveDataset,
+      setGlobalBusyState,
+    }),
+    [uploadedDataset, activeDataset, globalBusyState],
+  );
 
   return (
     <AppShell header={{ height: 78 }} padding="lg">
@@ -68,46 +83,19 @@ export default function App () {
               </Text>
             </Box>
 
-            {/* Error Alert */}
-            {state.error && (
-              <Alert
-                icon={<IconAlertCircle size="1rem" />}
-                title="Error"
-                color="red"
-              >
-                {state.error}
-              </Alert>
-            )}
+            {/* Workflow panels wrapped in context provider */}
+            <WorkflowProvider value={workflowContextValue}>
+              {/* Step 1: Load Data */}
+              <LoadDataPanel />
 
-            {/* Step 1: Load Data */}
-            <LoadDataPanel
-              matrixFilePath={state.matrixFilePath}
-              vectorFilePath={state.vectorFilePath}
-              uploadedDataset={state.uploadedDataset}
-              isLoading={state.busyState === "loading-data"}
-              isDisabled={!selectors.canLoadData && !state.uploadedDataset}
-              onSelectMatrixFile={actions.selectMatrixFile}
-              onSelectVectorFile={actions.selectVectorFile}
-              onClearMatrixFile={actions.clearMatrixFile}
-              onClearVectorFile={actions.clearVectorFile}
-              onLoad={actions.loadData}
-              onLoadExample={actions.loadExampleDataset}
-            />
+              {/* Step 2: Filter Descriptors */}
+              <FilterPanel />
 
-            {/* Step 2: Filter Descriptors */}
-            <FilterPanel
-              uploadedDataset={state.uploadedDataset}
-              activeDataset={state.activeDataset}
-              filterSettings={state.filterSettings}
-              isFiltered={state.isFiltered}
-              isLoading={state.busyState === "filtering"}
-              isDisabled={!selectors.canRunFilters}
-              onSettingsChange={actions.updateFilterSettings}
-              onRunFilters={actions.runDescriptorFilters}
-            />
-
-            <WorkflowProvider value={workflowContext}>
+              {/* Step 3: Select Variables */}
               <SelectionPanel />
+
+              {/* Step 4: Validate Model */}
+              <ValidationPanel />
             </WorkflowProvider>
           </Stack>
         </Container>

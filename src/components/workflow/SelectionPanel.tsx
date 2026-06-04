@@ -2,7 +2,7 @@ import { Stack, Text } from "@mantine/core";
 import { StepCard } from "../ui/StepCard";
 import { GaPanel } from "./GaPanel";
 import { OpsPanel } from "./OpsPanel";
-import { useWorkflowContext } from "./WorkflowContext";
+import { useWorkflowContext } from "../contexts/WorkflowContext";
 
 export function SelectionPanel() {
   const { activeDataset, globalBusyState } = useWorkflowContext();
