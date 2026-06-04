@@ -48,13 +48,13 @@ impl SessionState {
         Ok(result)
     }
 
-    pub fn run_ga(&self, config: GAConfig) -> Result<GAResult, String> {
+    pub fn run_ga(&self, config: GAConfig, handle: tauri::AppHandle) -> Result<GAResult, String> {
         let dataset = self.get_dataset().ok_or("No dataset loaded")?;
 
         let x = self.materialize_last_x()?;
         let y = dataset.y.clone();
 
-        let result = core::ga::run_ga(x, y, config);
+        let result = core::ga::run_ga_with_handle(x, y, config, Some(handle));
         Ok(result)
     }
 

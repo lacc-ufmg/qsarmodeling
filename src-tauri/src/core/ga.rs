@@ -3,8 +3,22 @@ use std::sync::Arc;
 use genetic_algorithm::strategy::evolve::prelude::*;
 use ndarray::{Array1, Array2};
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 
 use crate::utils::select_columns;
+
+pub const GA_PROGRESS_EVENT: &str = "ga:progress";
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GAProgressEvent {
+    pub phase: String,
+    pub current_generation: usize,
+    pub max_generations: usize,
+    pub stale_generations: usize,
+    pub best_generation: Option<usize>,
+    pub progress: f64,
+}
 
 /// Configuration for GA-based variable selection.
 ///
@@ -177,10 +191,101 @@ impl Fitness for VariableSelectionFitness {
     }
 }
 
+#[derive(Clone)]
+struct GaProgressReporter {
+    app: Option<tauri::AppHandle>,
+    max_generations: usize,
+}
+
+impl GaProgressReporter {
+    fn new(app: Option<tauri::AppHandle>, max_generations: usize) -> Self {
+        Self { app, max_generations }
+    }
+
+    fn emit<S: StrategyState<BinaryGenotype>, C: StrategyConfig>(
+        &self,
+        phase: &str,
+        state: &S,
+        _config: &C,
+    ) {
+        let Some(app) = &self.app else {
+            return;
+        };
+
+        let current_generation = state.current_generation();
+        let progress = if self.max_generations == 0 {
+            0.0
+        } else {
+            (((current_generation + 1) as f64 / self.max_generations as f64) * 100.0).min(100.0)
+        };
+
+        let _ = app.emit(
+            GA_PROGRESS_EVENT,
+            GAProgressEvent {
+                phase: phase.to_string(),
+                current_generation,
+                max_generations: self.max_generations,
+                stale_generations: state.stale_generations(),
+                best_generation: Some(state.best_generation()),
+                progress,
+            },
+        );
+    }
+}
+
+impl StrategyReporter for GaProgressReporter {
+    type Genotype = BinaryGenotype;
+
+    fn on_start<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
+        &mut self,
+        _genotype: &Self::Genotype,
+        state: &S,
+        config: &C,
+    ) {
+        self.emit("start", state, config);
+    }
+
+    fn on_generation_complete<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
+        &mut self,
+        _genotype: &Self::Genotype,
+        state: &S,
+        config: &C,
+    ) {
+        self.emit("generation", state, config);
+    }
+
+    fn on_new_best_chromosome<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
+        &mut self,
+        _genotype: &Self::Genotype,
+        state: &S,
+        config: &C,
+    ) {
+        self.emit("best", state, config);
+    }
+
+    fn on_finish<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
+        &mut self,
+        _genotype: &Self::Genotype,
+        state: &S,
+        config: &C,
+    ) {
+        self.emit("finish", state, config);
+    }
+}
+
 /// Run GA-based variable selection over the descriptor matrix `x` and response `y`.
 ///
 /// Each gene is a binary include/exclude flag for one column of `x`.
 pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
+    run_ga_with_handle(x, y, config, None)
+}
+
+pub fn run_ga_with_handle(
+    x: Array2<f64>,
+    y: Array1<f64>,
+    config: GAConfig,
+    app: Option<tauri::AppHandle>,
+) -> GAResult {
     debug_assert_eq!(
         x.nrows(),
         y.len(),
@@ -231,6 +336,8 @@ pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
         .build()
         .expect("failed to build BinaryGenotype");
 
+    let reporter = GaProgressReporter::new(app, config.max_generations);
+
     let mut builder = Evolve::builder()
         .with_genotype(genotype)
         .with_target_population_size(config.population_size)
@@ -248,6 +355,7 @@ pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
         .with_fitness_ordering(FitnessOrdering::Maximize)
         .with_max_generations(config.max_generations)
         .with_max_stale_generations(config.max_stale_generations)
+        .with_reporter(reporter)
         .with_replace_on_equal_fitness(true);
 
     if let Some(seed) = config.seed {
@@ -276,7 +384,7 @@ pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
 
     let (raw_cv_score, penalized_score) =
         validation_score(x.as_ref(), y.as_ref(), &selected_indices, &config)
-            .unwrap_or((f64::NEG_INFINITY, f64::NEG_INFINITY));
+            .unwrap_or((0.0, 0.0));
 
     let fitness_score = if penalized_score.is_finite() {
         (penalized_score / config.fitness_precision).round() as isize

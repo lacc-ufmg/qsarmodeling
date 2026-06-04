@@ -39,10 +39,11 @@ pub async fn run_selection_cmd(
 
 #[tauri::command]
 pub async fn run_ga_selection_cmd(
+    handle: tauri::AppHandle,
     state: State<'_, SessionState>,
     settings: GAConfig,
 ) -> Result<GAResult, String> {
-    state.run_ga(settings)
+    state.run_ga(settings, handle)
 }
 
 #[tauri::command]
