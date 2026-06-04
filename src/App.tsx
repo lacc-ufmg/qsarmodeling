@@ -15,13 +15,14 @@ import { ColorSchemeToggle } from "./components/ui/ColorSchemeToggle";
 import { LoadDataPanel } from "./components/workflow/LoadDataPanel";
 import { FilterPanel } from "./components/workflow/FilterPanel";
 import { SelectionPanel } from "./components/workflow/SelectionPanel";
+import { WorkflowProvider } from "./components/workflow/WorkflowContext";
 import icon from "./assets/icon.png";
 import { useState, useEffect } from "react";
 import { appInfo } from "./generated";
 
 export default function App () {
   const { toggleColorScheme } = useMantineColorScheme();
-  const { state, actions, selectors } = useQsarWorkflow();
+  const { state, actions, selectors, workflowContext } = useQsarWorkflow();
   const [version, setVersion] = useState("0.x.x");
 
   useEffect(() => {
@@ -105,19 +106,9 @@ export default function App () {
               onRunFilters={actions.runDescriptorFilters}
             />
 
-            <SelectionPanel
-              activeDataset={state.activeDataset}
-              selectionMode={state.selectionMode}
-              selectionResult={state.selectionResult}
-              opsSelectionSettings={state.opsSelectionSettings}
-              gaSelectionSettings={state.gaSelectionSettings}
-              isLoading={state.busyState === "selecting"}
-              isDisabled={!selectors.canRunSelection}
-              onSelectionModeChange={actions.updateSelectionMode}
-              onOpsSettingsChange={actions.updateOpsSelectionSettings}
-              onGaSettingsChange={actions.updateGaSelectionSettings}
-              onRunSelection={actions.runVariableSelection}
-            />
+            <WorkflowProvider value={workflowContext}>
+              <SelectionPanel />
+            </WorkflowProvider>
           </Stack>
         </Container>
       </AppShell.Main>

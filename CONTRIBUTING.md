@@ -40,7 +40,7 @@ npm i -g pnpm
 Instale o [Just](https://just.systems/):
 
 ```sh
-cargo install just
+cargo install just just-lsp
 ```
 
 ### IDE Recomendada
