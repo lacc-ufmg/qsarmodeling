@@ -3,21 +3,28 @@ use std::sync::Arc;
 use genetic_algorithm::strategy::evolve::prelude::*;
 use ndarray::{Array1, Array2};
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{ipc::Channel};
 
 use crate::utils::select_columns;
 
 pub const GA_PROGRESS_EVENT: &str = "ga:progress";
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GAProgressEvent {
-    pub phase: String,
-    pub current_generation: usize,
-    pub max_generations: usize,
-    pub stale_generations: usize,
-    pub best_generation: Option<usize>,
-    pub progress: f64,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum GaProgressEventKind {
+    Start,
+    Generation,
+    Finish,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "event")]
+pub struct GaProgressEvent {
+    event: GaProgressEventKind,
+    max_generations: usize,
+    current_generation: usize,
+    stale_generations: usize,
+    best_generation: Option<usize>,
+    progress: f64,
 }
 
 /// Configuration for GA-based variable selection.
@@ -193,43 +200,42 @@ impl Fitness for VariableSelectionFitness {
 
 #[derive(Clone)]
 struct GaProgressReporter {
-    app: Option<tauri::AppHandle>,
     max_generations: usize,
+    on_event: Channel<GaProgressEvent>,
 }
 
 impl GaProgressReporter {
-    fn new(app: Option<tauri::AppHandle>, max_generations: usize) -> Self {
-        Self { app, max_generations }
+    fn new(on_event: Channel<GaProgressEvent>, max_generations: usize) -> Self {
+        Self {
+            on_event,
+            max_generations,
+        }
     }
 
     fn emit<S: StrategyState<BinaryGenotype>, C: StrategyConfig>(
         &self,
-        phase: &str,
+        kind: GaProgressEventKind,
         state: &S,
         _config: &C,
     ) {
-        let Some(app) = &self.app else {
-            return;
-        };
-
         let current_generation = state.current_generation();
-        let progress = if self.max_generations == 0 {
+        let progress = if kind == GaProgressEventKind::Start || self.max_generations == 0 {
             0.0
+        } else if kind == GaProgressEventKind::Finish {
+            100.0
         } else {
             (((current_generation + 1) as f64 / self.max_generations as f64) * 100.0).min(100.0)
         };
 
-        let _ = app.emit(
-            GA_PROGRESS_EVENT,
-            GAProgressEvent {
-                phase: phase.to_string(),
-                current_generation,
-                max_generations: self.max_generations,
-                stale_generations: state.stale_generations(),
-                best_generation: Some(state.best_generation()),
-                progress,
-            },
-        );
+        let _ = self.on_event.send(GaProgressEvent {
+            progress,
+            event: kind,
+            current_generation,
+            max_generations: self.max_generations,
+            stale_generations: state.stale_generations(),
+            best_generation: Some(state.best_generation()),
+        });
+        return;
     }
 }
 
@@ -242,7 +248,7 @@ impl StrategyReporter for GaProgressReporter {
         state: &S,
         config: &C,
     ) {
-        self.emit("start", state, config);
+        self.emit(GaProgressEventKind::Start, state, config);
     }
 
     fn on_generation_complete<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
@@ -251,7 +257,7 @@ impl StrategyReporter for GaProgressReporter {
         state: &S,
         config: &C,
     ) {
-        self.emit("generation", state, config);
+        self.emit(GaProgressEventKind::Generation, state, config);
     }
 
     fn on_new_best_chromosome<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
@@ -260,7 +266,7 @@ impl StrategyReporter for GaProgressReporter {
         state: &S,
         config: &C,
     ) {
-        self.emit("best", state, config);
+        self.emit(GaProgressEventKind::Generation, state, config);
     }
 
     fn on_finish<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
@@ -269,7 +275,7 @@ impl StrategyReporter for GaProgressReporter {
         state: &S,
         config: &C,
     ) {
-        self.emit("finish", state, config);
+        self.emit(GaProgressEventKind::Finish, state, config);
     }
 }
 
@@ -284,7 +290,7 @@ pub fn run_ga_with_handle(
     x: Array2<f64>,
     y: Array1<f64>,
     config: GAConfig,
-    app: Option<tauri::AppHandle>,
+    on_event: Option<Channel<GaProgressEvent>>,
 ) -> GAResult {
     debug_assert_eq!(
         x.nrows(),
@@ -336,7 +342,7 @@ pub fn run_ga_with_handle(
         .build()
         .expect("failed to build BinaryGenotype");
 
-    let reporter = GaProgressReporter::new(app, config.max_generations);
+    let reporter = GaProgressReporter::new(on_event.expect("no on_event"), config.max_generations);
 
     let mut builder = Evolve::builder()
         .with_genotype(genotype)
@@ -383,8 +389,7 @@ pub fn run_ga_with_handle(
     let selected_count = selected_indices.len();
 
     let (raw_cv_score, penalized_score) =
-        validation_score(x.as_ref(), y.as_ref(), &selected_indices, &config)
-            .unwrap_or((0.0, 0.0));
+        validation_score(x.as_ref(), y.as_ref(), &selected_indices, &config).unwrap_or((0.0, 0.0));
 
     let fitness_score = if penalized_score.is_finite() {
         (penalized_score / config.fitness_precision).round() as isize
@@ -604,8 +609,7 @@ mod tests {
         let result = run_ga(x, y, config.clone());
 
         if result.penalized_score.is_finite() {
-            let expected =
-                (result.penalized_score / config.fitness_precision).round() as isize;
+            let expected = (result.penalized_score / config.fitness_precision).round() as isize;
 
             assert_eq!(result.fitness_score, expected);
         }

@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use tauri::path::BaseDirectory;
-use tauri::Manager;
-use tauri::State;
+use tauri::{Manager, State, ipc::Channel};
 
+use crate::core::ga::GaProgressEvent;
 use crate::core::ga::{GAConfig, GAResult};
 use crate::core::loader::DatasetMetadata;
 use crate::core::ops::{OpsConfig, OpsResult};
@@ -39,11 +39,11 @@ pub async fn run_selection_cmd(
 
 #[tauri::command]
 pub async fn run_ga_selection_cmd(
-    handle: tauri::AppHandle,
+    channel: Channel<GaProgressEvent>,
     state: State<'_, SessionState>,
     settings: GAConfig,
 ) -> Result<GAResult, String> {
-    state.run_ga(settings, handle)
+    state.run_ga(settings, channel)
 }
 
 #[tauri::command]

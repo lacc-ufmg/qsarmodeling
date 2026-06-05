@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
-import { Box, Button, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Box, Button, Progress, Badge, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { IconGauge, IconListCheck, IconSparkles } from "@tabler/icons-react";
 import { NumberFieldWithTooltip } from "../ui/NumberFieldWithTooltip";
 import { ResultCard } from "../ui/ResultCard";
 import { StatsRing } from "../ui/StatsRing";
-import type { GAConfig, GAResult } from "../../generated";
+import type { GAConfig, GaProgressEvent, GAResult } from "../../generated";
+import { Channel } from '@tauri-apps/api/core';
 import { runGaSelectionCmd } from "../../generated";
 import { useWorkflowContext } from "../contexts/WorkflowContext";
 
@@ -29,7 +30,7 @@ const DEFAULT_GA_SETTINGS: GAConfig = {
   parFitness: false,
 };
 
-function formatScore(value: number | null | undefined) {
+function formatScore (value: number | null | undefined) {
   if (value == null || !isFinite(value)) {
     return "N/A";
   }
@@ -37,12 +38,37 @@ function formatScore(value: number | null | undefined) {
   return value.toFixed(3);
 }
 
-export function GaPanel() {
+export function GaProgress ({ event } : { event: GaProgressEvent }) {
+  return (
+    <Paper p="md" radius="sm">
+      <Group justify="space-between" align="center" mb="xs">
+        <Text size="sm" fw={500}>
+          GA progress
+        </Text>
+        <Badge variant="light" color="grape">
+          {event ? `${Math.round(event.progress)}%` : "Idle"}
+        </Badge>
+      </Group>
+      <Progress value={event?.progress ?? 0} size="md" radius="xl" />
+      <Group justify="space-between" mt="xs">
+        <Text size="xs" c="dimmed">
+          Generation {event ? event.currentGeneration + 1 : 0} / {event?.maxGenerations ?? DEFAULT_GA_SETTINGS.maxGenerations}
+        </Text>
+        <Text size="xs" c="dimmed">
+          Stale {event?.staleGenerations ?? 0}
+        </Text>
+      </Group>
+    </Paper>
+  );
+}
+
+export function GaPanel () {
   const { activeDataset, globalBusyState, setGlobalBusyState } = useWorkflowContext();
   const [settings, setSettings] = useState<GAConfig>(DEFAULT_GA_SETTINGS);
   const [result, setResult] = useState<GAResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<GaProgressEvent | null>(null);
 
   const maxFeatureCount = activeDataset?.n_features ?? 1;
   const isDisabled = !activeDataset || globalBusyState !== "idle";
@@ -59,7 +85,13 @@ export function GaPanel() {
     try {
       setIsLoading(true);
       setGlobalBusyState("selecting");
-      const gaResult = await runGaSelectionCmd({ settings });
+      const channel = new Channel<GaProgressEvent>();
+      // channel.onmessage = setProgress;
+      channel.onmessage = (event: GaProgressEvent) => {
+        console.log("Received GA progress event:", event);
+        setProgress(event);
+      };
+      const gaResult = await runGaSelectionCmd({ settings, channel });
       setResult(gaResult);
       setError(null);
     } catch (err) {
@@ -67,6 +99,7 @@ export function GaPanel() {
     } finally {
       setIsLoading(false);
       setGlobalBusyState("idle");
+      setProgress(null);
     }
   }, [activeDataset, isDisabled, settings, setGlobalBusyState]);
 
@@ -223,6 +256,10 @@ export function GaPanel() {
           <Text size="sm" c="red">
             {error}
           </Text>
+        )}
+
+        {progress && (
+          <GaProgress event={progress} />
         )}
       </Stack>
 
