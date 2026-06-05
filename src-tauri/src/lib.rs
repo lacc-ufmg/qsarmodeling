@@ -1,10 +1,10 @@
-pub mod core;
 pub mod app;
+pub mod core;
 pub(crate) mod utils;
 pub mod validation;
 
-use serde::Serialize;
 use app::{commands, session};
+use serde::Serialize;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

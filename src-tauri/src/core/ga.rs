@@ -10,7 +10,7 @@ pub mod fitness;
 
 pub use config::{GAConfig, GAResult};
 pub use events::{GaProgressEvent, GaProgressEventKind, GaProgressReporter};
-use fitness::{mask_to_indices, validation_score, validation_score_ok, VariableSelectionFitness};
+use fitness::*;
 
 /// Run GA-based variable selection over the descriptor matrix `x` and response `y`.
 ///
@@ -74,7 +74,6 @@ pub fn run_ga_with_handle(
         .with_chromosome_recycling(true)
         .build()
         .expect("failed to build BinaryGenotype");
-
 
     let reporter = GaProgressReporter::new(on_event, config.max_generations);
     let mut builder = Evolve::builder()

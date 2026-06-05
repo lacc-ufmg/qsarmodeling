@@ -3,11 +3,11 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use crate::core;
-use crate::core::loader::{DatasetMetadata, RawDataset};
 use crate::core::filter::{FilterConfig, FilterPipeline, FilterResult};
 use crate::core::ga::{GAConfig, GAResult, GaProgressEvent};
+use crate::core::loader::{DatasetMetadata, RawDataset};
 use crate::core::ops::{OpsConfig, OpsResult};
-use tauri::{ipc::Channel};
+use tauri::ipc::Channel;
 
 pub struct SessionState {
     inner: Mutex<SessionInner>,
@@ -48,7 +48,11 @@ impl SessionState {
         Ok(result)
     }
 
-    pub fn run_ga(&self, config: GAConfig, channel: Channel<GaProgressEvent>) -> Result<GAResult, String> {
+    pub fn run_ga(
+        &self,
+        config: GAConfig,
+        channel: Channel<GaProgressEvent>,
+    ) -> Result<GAResult, String> {
         let dataset = self.get_dataset().ok_or("No dataset loaded")?;
 
         let x = self.materialize_last_x()?;

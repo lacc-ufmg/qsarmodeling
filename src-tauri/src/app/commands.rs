@@ -2,15 +2,15 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use tauri::path::BaseDirectory;
-use tauri::{Manager, State, ipc::Channel};
+use tauri::{ipc::Channel, Manager, State};
 
 use crate::core::ga::GaProgressEvent;
 use crate::core::ga::{GAConfig, GAResult};
 use crate::core::loader::DatasetMetadata;
 use crate::core::ops::{OpsConfig, OpsResult};
 
-use crate::core::filter::{FilterConfig, FilterResult};
 use super::session::SessionState;
+use crate::core::filter::{FilterConfig, FilterResult};
 
 #[tauri::command]
 pub async fn load_dataset_cmd(

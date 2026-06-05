@@ -1,6 +1,6 @@
 use genetic_algorithm::strategy::evolve::prelude::*;
 use serde::{Deserialize, Serialize};
-use tauri::{ipc::Channel};
+use tauri::ipc::Channel;
 
 pub const GA_PROGRESS_EVENT: &str = "ga:progress";
 
@@ -21,7 +21,6 @@ pub struct GaProgressEvent {
     best_generation: Option<usize>,
     progress: f64,
 }
-
 
 #[derive(Clone)]
 pub struct GaProgressReporter {

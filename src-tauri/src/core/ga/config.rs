@@ -128,4 +128,3 @@ pub struct GAResult {
     /// Whether the GA found at least one valid solution.
     pub found_solution: bool,
 }
-
