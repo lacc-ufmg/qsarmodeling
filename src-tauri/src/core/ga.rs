@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use genetic_algorithm::strategy::evolve::prelude::*;
 use ndarray::{Array1, Array2};
-use tauri::{ipc::Channel};
+use tauri::ipc::Channel;
 
 pub mod config;
 pub mod events;
@@ -10,8 +10,7 @@ pub mod fitness;
 
 pub use config::{GAConfig, GAResult};
 pub use events::{GaProgressEvent, GaProgressEventKind, GaProgressReporter};
-use fitness::{VariableSelectionFitness, mask_to_indices, validation_score};
-
+use fitness::{mask_to_indices, validation_score, validation_score_ok, VariableSelectionFitness};
 
 /// Run GA-based variable selection over the descriptor matrix `x` and response `y`.
 ///
@@ -76,9 +75,10 @@ pub fn run_ga_with_handle(
         .build()
         .expect("failed to build BinaryGenotype");
 
-    let reporter = GaProgressReporter::new(on_event.expect("no on_event"), config.max_generations);
 
+    let reporter = GaProgressReporter::new(on_event, config.max_generations);
     let mut builder = Evolve::builder()
+        .with_reporter(reporter)
         .with_genotype(genotype)
         .with_target_population_size(config.population_size)
         .with_select(SelectTournament::new(
@@ -95,7 +95,6 @@ pub fn run_ga_with_handle(
         .with_fitness_ordering(FitnessOrdering::Maximize)
         .with_max_generations(config.max_generations)
         .with_max_stale_generations(config.max_stale_generations)
-        .with_reporter(reporter)
         .with_replace_on_equal_fitness(true);
 
     if let Some(seed) = config.seed {
@@ -123,8 +122,7 @@ pub fn run_ga_with_handle(
     let selected_count = selected_indices.len();
 
     let (raw_cv_score, penalized_score) =
-        validation_score(x.as_ref(), y.as_ref(), &selected_indices, &config).unwrap_or((0.0, 0.0));
-
+        validation_score_ok(x.as_ref(), y.as_ref(), &selected_indices, &config);
     let fitness_score = if penalized_score.is_finite() {
         (penalized_score / config.fitness_precision).round() as isize
     } else {
@@ -142,7 +140,6 @@ pub fn run_ga_with_handle(
         found_solution: penalized_score.is_finite(),
     }
 }
-
 
 #[cfg(test)]
 mod tests {

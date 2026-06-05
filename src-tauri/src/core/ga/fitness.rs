@@ -79,3 +79,13 @@ pub(super) fn validation_score(
 
     Some((raw_cv_score, penalized_score))
 }
+
+/// Score a subset with k-fold CV Q² minus a subset-size penalty.
+pub(super) fn validation_score_ok(
+    x: &Array2<f64>,
+    y: &Array1<f64>,
+    selected: &[usize],
+    config: &GAConfig,
+) -> (f64, f64) {
+    validation_score(x, y, selected, config).unwrap_or((0.0, f64::INFINITY))
+}

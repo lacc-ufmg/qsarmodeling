@@ -26,11 +26,11 @@ pub struct GaProgressEvent {
 #[derive(Clone)]
 pub struct GaProgressReporter {
     max_generations: usize,
-    on_event: Channel<GaProgressEvent>,
+    on_event: Option<Channel<GaProgressEvent>>,
 }
 
 impl GaProgressReporter {
-    pub fn new(on_event: Channel<GaProgressEvent>, max_generations: usize) -> Self {
+    pub fn new(on_event: Option<Channel<GaProgressEvent>>, max_generations: usize) -> Self {
         Self {
             on_event,
             max_generations,
@@ -43,6 +43,11 @@ impl GaProgressReporter {
         state: &S,
         _config: &C,
     ) {
+        let on_event = if let Some(on_event) = self.on_event.as_ref() {
+            on_event
+        } else {
+            return;
+        };
         let current_generation = state.current_generation();
         let progress = if kind == GaProgressEventKind::Start || self.max_generations == 0 {
             0.0
@@ -52,7 +57,7 @@ impl GaProgressReporter {
             (((current_generation + 1) as f64 / self.max_generations as f64) * 100.0).min(100.0)
         };
 
-        let _ = self.on_event.send(GaProgressEvent {
+        let _ = on_event.send(GaProgressEvent {
             progress,
             event: kind,
             current_generation,
