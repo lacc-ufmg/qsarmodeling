@@ -2,282 +2,16 @@ use std::sync::Arc;
 
 use genetic_algorithm::strategy::evolve::prelude::*;
 use ndarray::{Array1, Array2};
-use serde::{Deserialize, Serialize};
 use tauri::{ipc::Channel};
 
-use crate::utils::select_columns;
+pub mod config;
+pub mod events;
+pub mod fitness;
 
-pub const GA_PROGRESS_EVENT: &str = "ga:progress";
+pub use config::{GAConfig, GAResult};
+pub use events::{GaProgressEvent, GaProgressEventKind, GaProgressReporter};
+use fitness::{VariableSelectionFitness, mask_to_indices, validation_score};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum GaProgressEventKind {
-    Start,
-    Generation,
-    Finish,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase", tag = "event")]
-pub struct GaProgressEvent {
-    event: GaProgressEventKind,
-    max_generations: usize,
-    current_generation: usize,
-    stale_generations: usize,
-    best_generation: Option<usize>,
-    progress: f64,
-}
-
-/// Configuration for GA-based variable selection.
-///
-/// The GA maximizes a penalized cross-validated score:
-///     penalized_score = q2_cv - size_penalty * (n_selected / n_features)
-///
-/// The raw score is the k-fold CV Q² (higher is better).
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GAConfig {
-    /// Number of chromosomes in the population.
-    pub population_size: usize,
-
-    /// Maximum number of generations.
-    pub max_generations: usize,
-
-    /// Stop after this many generations without improvement.
-    pub max_stale_generations: usize,
-
-    /// Optional early stop once the penalized fitness reaches this target.
-    /// Interpreted in *raw score units* (e.g. 0.95), then scaled internally.
-    pub target_fitness_score: Option<f64>,
-
-    /// Selection pressure for `SelectTournament`.
-    /// Typical: 0.3..0.7
-    pub replacement_rate: f32,
-
-    /// Fraction preserved as elite.
-    /// Typical: 0.01..0.05
-    pub elitism_rate: f32,
-
-    /// Tournament size.
-    pub tournament_size: usize,
-
-    /// Fraction of parents selected for reproduction in crossover.
-    /// Typical: 0.5..0.8
-    pub crossover_selection_rate: f32,
-
-    /// Probability that a selected pair actually crosses over.
-    /// Typical: 0.5..0.9
-    pub crossover_rate: f32,
-
-    /// Probability of mutating a chromosome.
-    /// Typical for binary genomes: 0.05..0.3
-    pub mutation_probability: f32,
-
-    /// Number of CV folds.
-    pub cv_folds: usize,
-
-    /// Ridge regularization used when fitting the fold-wise linear model.
-    /// Small positive values help with collinearity.
-    pub ridge_lambda: f64,
-
-    /// Minimum number of selected variables allowed.
-    pub min_features: usize,
-
-    /// Maximum number of selected variables allowed.
-    /// If `None`, no explicit upper bound is enforced.
-    pub max_features: Option<usize>,
-
-    /// Penalty applied to larger subsets.
-    /// The score is reduced by:
-    ///     size_penalty * (n_selected / n_features)
-    pub size_penalty: f64,
-
-    /// Precision used to convert the floating-point fitness to `FitnessValue` (`isize`).
-    /// Smaller values => larger integer scale.
-    pub fitness_precision: f64,
-
-    /// Seed for deterministic runs.
-    pub seed: Option<u64>,
-
-    /// Enable parallel fitness evaluation.
-    pub par_fitness: bool,
-}
-
-impl Default for GAConfig {
-    fn default() -> Self {
-        Self {
-            population_size: 200,
-            max_generations: 500,
-            max_stale_generations: 100,
-            target_fitness_score: None,
-            replacement_rate: 0.5,
-            elitism_rate: 0.02,
-            tournament_size: 4,
-            crossover_selection_rate: 0.7,
-            crossover_rate: 0.8,
-            mutation_probability: 0.2,
-            cv_folds: 5,
-            ridge_lambda: 1e-8,
-            min_features: 1,
-            max_features: None,
-            size_penalty: 0.02,
-            fitness_precision: 1e-6,
-            seed: None,
-            par_fitness: true,
-        }
-    }
-}
-
-/// Result of the GA variable selection.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GAResult {
-    /// Best binary mask found by the GA.
-    pub best_mask: Vec<bool>,
-
-    /// Indices of selected variables.
-    pub selected_indices: Vec<usize>,
-
-    /// Convenience count of selected variables.
-    pub selected_count: usize,
-
-    /// Raw cross-validated Q² score before subset-size penalty.
-    pub raw_cv_score: f64,
-
-    /// Penalized score used by the fitness function.
-    pub penalized_score: f64,
-
-    /// Integer fitness value seen by the GA.
-    pub fitness_score: isize,
-
-    /// Best generation reported by the GA.
-    pub best_generation: Option<usize>,
-
-    /// Whether the GA found at least one valid solution.
-    pub found_solution: bool,
-}
-
-#[derive(Clone, Debug)]
-struct VariableSelectionFitness {
-    x: Arc<Array2<f64>>,
-    y: Arc<Array1<f64>>,
-    config: GAConfig,
-}
-
-impl Fitness for VariableSelectionFitness {
-    type Genotype = BinaryGenotype;
-
-    fn calculate_for_chromosome(
-        &mut self,
-        chromosome: &FitnessChromosome<Self>,
-        _genotype: &FitnessGenotype<Self>,
-    ) -> Option<FitnessValue> {
-        let selected = mask_to_indices(&chromosome.genes);
-
-        if selected.len() < self.config.min_features {
-            return None;
-        }
-        if let Some(max_features) = self.config.max_features {
-            if selected.len() > max_features {
-                return None;
-            }
-        }
-
-        let (_raw_cv_score, penalized_score) =
-            validation_score(self.x.as_ref(), self.y.as_ref(), &selected, &self.config)?;
-
-        if !penalized_score.is_finite() {
-            return None;
-        }
-
-        let scaled = (penalized_score / self.config.fitness_precision).round();
-        if !scaled.is_finite() {
-            return None;
-        }
-
-        Some(scaled as FitnessValue)
-    }
-}
-
-#[derive(Clone)]
-struct GaProgressReporter {
-    max_generations: usize,
-    on_event: Channel<GaProgressEvent>,
-}
-
-impl GaProgressReporter {
-    fn new(on_event: Channel<GaProgressEvent>, max_generations: usize) -> Self {
-        Self {
-            on_event,
-            max_generations,
-        }
-    }
-
-    fn emit<S: StrategyState<BinaryGenotype>, C: StrategyConfig>(
-        &self,
-        kind: GaProgressEventKind,
-        state: &S,
-        _config: &C,
-    ) {
-        let current_generation = state.current_generation();
-        let progress = if kind == GaProgressEventKind::Start || self.max_generations == 0 {
-            0.0
-        } else if kind == GaProgressEventKind::Finish {
-            100.0
-        } else {
-            (((current_generation + 1) as f64 / self.max_generations as f64) * 100.0).min(100.0)
-        };
-
-        let _ = self.on_event.send(GaProgressEvent {
-            progress,
-            event: kind,
-            current_generation,
-            max_generations: self.max_generations,
-            stale_generations: state.stale_generations(),
-            best_generation: Some(state.best_generation()),
-        });
-        return;
-    }
-}
-
-impl StrategyReporter for GaProgressReporter {
-    type Genotype = BinaryGenotype;
-
-    fn on_start<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
-        &mut self,
-        _genotype: &Self::Genotype,
-        state: &S,
-        config: &C,
-    ) {
-        self.emit(GaProgressEventKind::Start, state, config);
-    }
-
-    fn on_generation_complete<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
-        &mut self,
-        _genotype: &Self::Genotype,
-        state: &S,
-        config: &C,
-    ) {
-        self.emit(GaProgressEventKind::Generation, state, config);
-    }
-
-    fn on_new_best_chromosome<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
-        &mut self,
-        _genotype: &Self::Genotype,
-        state: &S,
-        config: &C,
-    ) {
-        self.emit(GaProgressEventKind::Generation, state, config);
-    }
-
-    fn on_finish<S: StrategyState<Self::Genotype>, C: StrategyConfig>(
-        &mut self,
-        _genotype: &Self::Genotype,
-        state: &S,
-        config: &C,
-    ) {
-        self.emit(GaProgressEventKind::Finish, state, config);
-    }
-}
 
 /// Run GA-based variable selection over the descriptor matrix `x` and response `y`.
 ///
@@ -409,45 +143,13 @@ pub fn run_ga_with_handle(
     }
 }
 
-fn mask_to_indices(mask: &[bool]) -> Vec<usize> {
-    mask.iter()
-        .enumerate()
-        .filter_map(|(i, &flag)| flag.then_some(i))
-        .collect()
-}
-
-/// Score a subset with k-fold CV Q² minus a subset-size penalty.
-fn validation_score(
-    x: &Array2<f64>,
-    y: &Array1<f64>,
-    selected: &[usize],
-    config: &GAConfig,
-) -> Option<(f64, f64)> {
-    if selected.is_empty() {
-        return None;
-    }
-
-    let x_selected = select_columns(x, selected);
-    let n_samples = x_selected.nrows();
-    let n_lv = selected.len().min(n_samples.saturating_sub(1)).max(1);
-
-    let (raw_cv_score, rmsecv) = crate::validation::metrics::loo_q2_rmsecv(&x_selected, y, n_lv);
-    if !raw_cv_score.is_finite() || !rmsecv.is_finite() {
-        return None;
-    }
-
-    let size_penalty = config.size_penalty * (selected.len() as f64 / x.ncols().max(1) as f64);
-    let penalized_score = raw_cv_score - size_penalty;
-
-    Some((raw_cv_score, penalized_score))
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ndarray::{array, Array1, Array2};
 
-    fn simple_dataset() -> (Array2<f64>, Array1<f64>) {
+    pub fn simple_dataset() -> (Array2<f64>, Array1<f64>) {
         // Small deterministic dataset
         let x = array![
             [1.0, 0.0, 3.0],
@@ -463,7 +165,7 @@ mod tests {
         (x, y)
     }
 
-    fn test_config() -> GAConfig {
+    pub fn test_config() -> GAConfig {
         GAConfig {
             population_size: 30,
             max_generations: 50,
