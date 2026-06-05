@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { Box, Button, Progress, Badge, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { IconGauge, IconListCheck, IconSparkles } from "@tabler/icons-react";
-import { NumberFieldWithTooltip } from "../ui/NumberFieldWithTooltip";
-import { ResultCard } from "../ui/ResultCard";
-import { StatsRing } from "../ui/StatsRing";
-import type { GAConfig, GaProgressEvent, GAResult } from "../../generated";
+import { NumberFieldWithTooltip } from "../../ui/NumberFieldWithTooltip";
+import { ResultCard } from "../../ui/ResultCard";
+import { StatsRing } from "../../ui/StatsRing";
+import type { GAConfig, GaProgressEvent, GAResult } from "../../../generated";
 import { Channel } from '@tauri-apps/api/core';
-import { runGaSelectionCmd } from "../../generated";
-import { useWorkflowContext } from "../contexts/WorkflowContext";
+import { runGaSelectionCmd } from "../../../generated";
+import { useWorkflowContext } from "../../contexts/WorkflowContext";
 
 const DEFAULT_GA_SETTINGS: GAConfig = {
   populationSize: 100,

@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { Box, Button, Group, Paper, Stack, Text } from "@mantine/core";
 import { IconListCheck } from "@tabler/icons-react";
-import { ResultCard } from "../ui/ResultCard";
-import { SliderFieldWithTooltip } from "../ui/SliderFieldWithTooltip";
-import type { OpsConfig, OpsResult } from "../../generated";
-import { runSelectionCmd } from "../../generated";
-import { useWorkflowContext } from "../contexts/WorkflowContext";
+import { ResultCard } from "../../ui/ResultCard";
+import { SliderFieldWithTooltip } from "../../ui/SliderFieldWithTooltip";
+import type { OpsConfig, OpsResult } from "../../../generated";
+import { runSelectionCmd } from "../../../generated";
+import { useWorkflowContext } from "../../contexts/WorkflowContext";
 
 const DEFAULT_OPS_SETTINGS: OpsConfig = {
   latentVarsOps: 3,

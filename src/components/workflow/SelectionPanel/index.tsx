@@ -1,9 +1,9 @@
 import { Paper, Badge, SegmentedControl, Group, Stack, Text } from "@mantine/core";
 import { IconGauge, IconSparkles } from "@tabler/icons-react";
-import { StepCard } from "../ui/StepCard";
+import { StepCard } from "../../ui/StepCard";
 import { GaPanel } from "./GaPanel";
 import { OpsPanel } from "./OpsPanel";
-import { useWorkflowContext } from "../contexts/WorkflowContext";
+import { useWorkflowContext } from "../../contexts/WorkflowContext";
 import { useState } from "react";
 
 enum SelectionMode {
