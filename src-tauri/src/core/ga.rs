@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use genetic_algorithm::strategy::evolve::prelude::*;
 use ndarray::{Array1, Array2};
@@ -16,7 +17,7 @@ use fitness::*;
 ///
 /// Each gene is a binary include/exclude flag for one column of `x`.
 pub fn run_ga(x: Array2<f64>, y: Array1<f64>, config: GAConfig) -> GAResult {
-    run_ga_with_handle(x, y, config, None)
+    run_ga_with_handle(x, y, config, None, None)
 }
 
 pub fn run_ga_with_handle(
@@ -24,6 +25,7 @@ pub fn run_ga_with_handle(
     y: Array1<f64>,
     config: GAConfig,
     on_event: Option<Channel<GaProgressEvent>>,
+    abort_flag: Option<Arc<AtomicBool>>,
 ) -> GAResult {
     debug_assert_eq!(
         x.nrows(),
@@ -96,6 +98,9 @@ pub fn run_ga_with_handle(
         .with_max_stale_generations(config.max_stale_generations)
         .with_replace_on_equal_fitness(true);
 
+    if let Some(flag) = abort_flag {
+        builder = builder.with_abort_flag(flag)
+    }
     if let Some(seed) = config.seed {
         builder = builder.with_rng_seed_from_u64(seed);
     }

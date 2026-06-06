@@ -38,6 +38,13 @@ pub async fn run_selection_cmd(
 }
 
 #[tauri::command]
+pub async fn ga_send_abort(
+    state: State<'_, SessionState>,
+) -> Result<(), String> {
+    state.ga_send_abort()
+}
+
+#[tauri::command]
 pub async fn run_ga_selection_cmd(
     channel: Channel<GaProgressEvent>,
     state: State<'_, SessionState>,

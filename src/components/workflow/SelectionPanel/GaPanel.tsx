@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { Box, Button, Progress, Badge, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
-import { IconGauge, IconListCheck, IconSparkles } from "@tabler/icons-react";
+import { IconAlertCircle, IconGauge, IconListCheck, IconSparkles } from "@tabler/icons-react";
 import { NumberFieldWithTooltip } from "../../ui/NumberFieldWithTooltip";
 import { ResultCard } from "../../ui/ResultCard";
 import { StatsRing } from "../../ui/StatsRing";
 import type { GAConfig, GaProgressEvent, GAResult } from "../../../generated";
 import { Channel } from '@tauri-apps/api/core';
-import { runGaSelectionCmd } from "../../../generated";
+import { runGaSelectionCmd, gaSendAbort } from "../../../generated";
 import { useWorkflowContext } from "../../contexts/WorkflowContext";
 
 const DEFAULT_GA_SETTINGS: GAConfig = {
@@ -27,7 +27,7 @@ const DEFAULT_GA_SETTINGS: GAConfig = {
   sizePenalty: 0.02,
   fitnessPrecision: 1e-6,
   seed: null,
-  parFitness: false,
+  parFitness: true,
 };
 
 function formatScore (value: number | null | undefined) {
@@ -240,6 +240,16 @@ export function GaPanel () {
           />
         </SimpleGrid>
 
+        {error && (
+          <Text size="sm" c="red">
+            {error}
+          </Text>
+        )}
+
+        {progress && (
+          <GaProgress event={progress} />
+        )}
+
         <Box>
           <Button
             onClick={runSelection}
@@ -250,17 +260,19 @@ export function GaPanel () {
           >
             Run GA
           </Button>
+          {isLoading && (
+            <Button
+              variant="outline"
+              color="red"
+              ml="sm"
+              leftSection={<IconAlertCircle size="1rem" />}
+              onClick={async () => { await gaSendAbort();}}
+            >
+              Send abort signal
+            </Button>
+          )}
         </Box>
 
-        {error && (
-          <Text size="sm" c="red">
-            {error}
-          </Text>
-        )}
-
-        {progress && (
-          <GaProgress event={progress} />
-        )}
       </Stack>
 
       {result && <ResultCard title="GA completed">{summary}</ResultCard>}

@@ -1,6 +1,6 @@
 use ndarray::Array2;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, atomic::AtomicBool};
 
 use crate::core;
 use crate::core::filter::{FilterConfig, FilterPipeline, FilterResult};
@@ -18,7 +18,9 @@ struct SessionInner {
     pipeline: Option<FilterPipeline>,
     last_filter_config: Option<FilterConfig>,
     last_filter_result: Option<FilterResult>,
+    ga_abort_flag: Option<Arc<AtomicBool>>,
 }
+
 
 impl SessionState {
     pub fn new() -> Self {
@@ -28,6 +30,7 @@ impl SessionState {
                 pipeline: None,
                 last_filter_config: None,
                 last_filter_result: None,
+                ga_abort_flag: None,
             }),
         }
     }
@@ -58,8 +61,21 @@ impl SessionState {
         let x = self.materialize_last_x()?;
         let y = dataset.y.clone();
 
-        let result = core::ga::run_ga_with_handle(x, y, config, Some(channel));
+        let abort_flag = Arc::new(AtomicBool::new(false));
+        self.inner.lock().unwrap().ga_abort_flag = Some(abort_flag.clone());
+        let result = core::ga::run_ga_with_handle(x, y, config, Some(channel), Some(abort_flag));
+        self.inner.lock().unwrap().ga_abort_flag = None;
         Ok(result)
+    }
+
+    pub fn ga_send_abort(&self) -> Result<(), String> {
+        let inner = self.inner.lock().unwrap();
+        if let Some(abort_flag) = &inner.ga_abort_flag {
+            abort_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        } else {
+            Err("No GA running".to_string())
+        }
     }
 
     pub fn load_dataset(&self, x_path: &Path, y_path: &Path) -> Result<DatasetMetadata, String> {
