@@ -13,7 +13,7 @@ enum SelectionMode {
 
 export function SelectionPanel () {
   const { activeDataset } = useWorkflowContext();
-  const [selectionMode, setSelectionMode] = useState<SelectionMode>(SelectionMode.OPS);
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>(SelectionMode.GA);
 
   return (
     <StepCard
@@ -39,8 +39,8 @@ export function SelectionPanel () {
               value={selectionMode}
               onChange={(value) => setSelectionMode(value as SelectionMode)}
               data={[
-                { label: "OPS", value: SelectionMode.OPS },
                 { label: "GA", value: SelectionMode.GA },
+                { label: "OPS", value: SelectionMode.OPS },
               ]}
             />
           </Paper>

@@ -38,9 +38,7 @@ pub async fn run_selection_cmd(
 }
 
 #[tauri::command]
-pub async fn ga_send_abort(
-    state: State<'_, SessionState>,
-) -> Result<(), String> {
+pub async fn ga_send_abort(state: State<'_, SessionState>) -> Result<(), String> {
     state.ga_send_abort()
 }
 

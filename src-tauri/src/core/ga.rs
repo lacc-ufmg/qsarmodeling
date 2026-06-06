@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 use genetic_algorithm::strategy::evolve::prelude::*;
 use ndarray::{Array1, Array2};

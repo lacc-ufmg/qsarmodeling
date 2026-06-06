@@ -1,6 +1,6 @@
 use ndarray::Array2;
 use std::path::Path;
-use std::sync::{Arc, Mutex, atomic::AtomicBool};
+use std::sync::{atomic::AtomicBool, Arc, Mutex};
 
 use crate::core;
 use crate::core::filter::{FilterConfig, FilterPipeline, FilterResult};
@@ -20,7 +20,6 @@ struct SessionInner {
     last_filter_result: Option<FilterResult>,
     ga_abort_flag: Option<Arc<AtomicBool>>,
 }
-
 
 impl SessionState {
     pub fn new() -> Self {
