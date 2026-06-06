@@ -12,8 +12,7 @@ enum SelectionMode {
 }
 
 export function SelectionPanel () {
-  const { activeDataset, globalBusyState } = useWorkflowContext();
-  const isDisabled = !activeDataset || globalBusyState !== "idle";
+  const { activeDataset } = useWorkflowContext();
   const [selectionMode, setSelectionMode] = useState<SelectionMode>(SelectionMode.OPS);
 
   return (
@@ -22,7 +21,7 @@ export function SelectionPanel () {
       title="Select variables"
       description="Choose the best subset of descriptors for your model"
       isComplete={false}
-      disabled={isDisabled}
+      disabled={!activeDataset}
     >
       {activeDataset ? (
         <Stack gap="md">

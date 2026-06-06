@@ -100,7 +100,7 @@ export function ValidationPanel() {
     }
   }, [activeDataset]);
 
-  const isDisabled = globalBusyState !== "idle";
+  const isDisabled = !activeDataset || globalBusyState !== "idle";
   const selectionResult = Boolean(activeDataset); // Placeholder; actual value would come from SelectionPanel
   const canRunPipeline = false; // TODO: Update when pipeline conditions are defined
   return (

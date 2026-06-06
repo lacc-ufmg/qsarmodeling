@@ -8,6 +8,7 @@ import type { GAConfig, GaProgressEvent, GAResult } from "../../../generated";
 import { Channel } from '@tauri-apps/api/core';
 import { runGaSelectionCmd, gaSendAbort } from "../../../generated";
 import { useWorkflowContext } from "../../contexts/WorkflowContext";
+import { SliderFieldWithTooltip } from "../../ui/SliderFieldWithTooltip";
 
 const DEFAULT_GA_SETTINGS: GAConfig = {
   populationSize: 100,
@@ -216,7 +217,7 @@ export function GaPanel () {
             decimalScale={0}
             fixedDecimalScale={false}
           />
-          <NumberFieldWithTooltip
+          <SliderFieldWithTooltip
             label="Min features"
             help="Minimum number of selected variables allowed by GA."
             value={settings.minFeatures}
@@ -224,10 +225,9 @@ export function GaPanel () {
             max={maxFeatureCount}
             step={1}
             onChange={(v) => updateSettings({ minFeatures: v })}
-            decimalScale={0}
-            fixedDecimalScale={false}
+            sliderLabel={v => `${v} (${Math.round(v/maxFeatureCount*100)}%)`}
           />
-          <NumberFieldWithTooltip
+          <SliderFieldWithTooltip
             label="Max features"
             help="Maximum number of selected variables allowed by GA."
             value={settings.maxFeatures ?? maxFeatureCount}
@@ -235,8 +235,7 @@ export function GaPanel () {
             max={maxFeatureCount}
             step={1}
             onChange={(v) => updateSettings({ maxFeatures: v })}
-            decimalScale={0}
-            fixedDecimalScale={false}
+            sliderLabel={v => `${v} (${Math.round(v/maxFeatureCount*100)}%)`}
           />
         </SimpleGrid>
 
@@ -266,7 +265,7 @@ export function GaPanel () {
               color="red"
               ml="sm"
               leftSection={<IconAlertCircle size="1rem" />}
-              onClick={async () => { await gaSendAbort();}}
+              onClick={async () => { await gaSendAbort(); setIsLoading(false); }}
             >
               Send abort signal
             </Button>
