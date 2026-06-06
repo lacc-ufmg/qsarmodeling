@@ -1,12 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
-import { Box, Button, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
-import { IconGauge, IconListCheck, IconSparkles } from "@tabler/icons-react";
-import { NumberFieldWithTooltip } from "../ui/NumberFieldWithTooltip";
-import { ResultCard } from "../ui/ResultCard";
-import { StatsRing } from "../ui/StatsRing";
-import type { GAConfig, GAResult } from "../../generated";
-import { runGaSelectionCmd } from "../../generated";
-import { useWorkflowContext } from "../contexts/WorkflowContext";
+import { Box, Button, Progress, Badge, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
+import { IconAlertCircle, IconGauge, IconListCheck, IconSparkles } from "@tabler/icons-react";
+import { NumberFieldWithTooltip } from "../../ui/NumberFieldWithTooltip";
+import { ResultCard } from "../../ui/ResultCard";
+import { StatsRing } from "../../ui/StatsRing";
+import type { GAConfig, GaProgressEvent, GAResult } from "../../../generated";
+import { Channel } from '@tauri-apps/api/core';
+import { runGaSelectionCmd, gaSendAbort } from "../../../generated";
+import { useWorkflowContext } from "../../contexts/WorkflowContext";
+import { SliderFieldWithTooltip } from "../../ui/SliderFieldWithTooltip";
 
 const DEFAULT_GA_SETTINGS: GAConfig = {
   populationSize: 100,
@@ -26,10 +28,10 @@ const DEFAULT_GA_SETTINGS: GAConfig = {
   sizePenalty: 0.02,
   fitnessPrecision: 1e-6,
   seed: null,
-  parFitness: false,
+  parFitness: true,
 };
 
-function formatScore(value: number | null | undefined) {
+function formatScore (value: number | null | undefined) {
   if (value == null || !isFinite(value)) {
     return "N/A";
   }
@@ -37,12 +39,37 @@ function formatScore(value: number | null | undefined) {
   return value.toFixed(3);
 }
 
-export function GaPanel() {
+export function GaProgress ({ event } : { event: GaProgressEvent }) {
+  return (
+    <Paper p="md" radius="sm">
+      <Group justify="space-between" align="center" mb="xs">
+        <Text size="sm" fw={500}>
+          GA progress
+        </Text>
+        <Badge variant="light" color="grape">
+          {event ? `${Math.round(event.progress)}%` : "Idle"}
+        </Badge>
+      </Group>
+      <Progress value={event?.progress ?? 0} size="md" radius="xl" />
+      <Group justify="space-between" mt="xs">
+        <Text size="xs" c="dimmed">
+          Generation {event ? event.currentGeneration + 1 : 0} / {event?.maxGenerations ?? DEFAULT_GA_SETTINGS.maxGenerations}
+        </Text>
+        <Text size="xs" c="dimmed">
+          Stale {event?.staleGenerations ?? 0}
+        </Text>
+      </Group>
+    </Paper>
+  );
+}
+
+export function GaPanel () {
   const { activeDataset, globalBusyState, setGlobalBusyState } = useWorkflowContext();
   const [settings, setSettings] = useState<GAConfig>(DEFAULT_GA_SETTINGS);
   const [result, setResult] = useState<GAResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<GaProgressEvent | null>(null);
 
   const maxFeatureCount = activeDataset?.n_features ?? 1;
   const isDisabled = !activeDataset || globalBusyState !== "idle";
@@ -59,7 +86,13 @@ export function GaPanel() {
     try {
       setIsLoading(true);
       setGlobalBusyState("selecting");
-      const gaResult = await runGaSelectionCmd({ settings });
+      const channel = new Channel<GaProgressEvent>();
+      // channel.onmessage = setProgress;
+      channel.onmessage = (event: GaProgressEvent) => {
+        console.log("Received GA progress event:", event);
+        setProgress(event);
+      };
+      const gaResult = await runGaSelectionCmd({ settings, channel });
       setResult(gaResult);
       setError(null);
     } catch (err) {
@@ -67,6 +100,7 @@ export function GaPanel() {
     } finally {
       setIsLoading(false);
       setGlobalBusyState("idle");
+      setProgress(null);
     }
   }, [activeDataset, isDisabled, settings, setGlobalBusyState]);
 
@@ -183,7 +217,7 @@ export function GaPanel() {
             decimalScale={0}
             fixedDecimalScale={false}
           />
-          <NumberFieldWithTooltip
+          <SliderFieldWithTooltip
             label="Min features"
             help="Minimum number of selected variables allowed by GA."
             value={settings.minFeatures}
@@ -191,10 +225,9 @@ export function GaPanel() {
             max={maxFeatureCount}
             step={1}
             onChange={(v) => updateSettings({ minFeatures: v })}
-            decimalScale={0}
-            fixedDecimalScale={false}
+            sliderLabel={v => `${v} (${Math.round(v/maxFeatureCount*100)}%)`}
           />
-          <NumberFieldWithTooltip
+          <SliderFieldWithTooltip
             label="Max features"
             help="Maximum number of selected variables allowed by GA."
             value={settings.maxFeatures ?? maxFeatureCount}
@@ -202,10 +235,19 @@ export function GaPanel() {
             max={maxFeatureCount}
             step={1}
             onChange={(v) => updateSettings({ maxFeatures: v })}
-            decimalScale={0}
-            fixedDecimalScale={false}
+            sliderLabel={v => `${v} (${Math.round(v/maxFeatureCount*100)}%)`}
           />
         </SimpleGrid>
+
+        {error && (
+          <Text size="sm" c="red">
+            {error}
+          </Text>
+        )}
+
+        {progress && (
+          <GaProgress event={progress} />
+        )}
 
         <Box>
           <Button
@@ -217,13 +259,19 @@ export function GaPanel() {
           >
             Run GA
           </Button>
+          {isLoading && (
+            <Button
+              variant="outline"
+              color="red"
+              ml="sm"
+              leftSection={<IconAlertCircle size="1rem" />}
+              onClick={async () => { await gaSendAbort(); setIsLoading(false); }}
+            >
+              Send abort signal
+            </Button>
+          )}
         </Box>
 
-        {error && (
-          <Text size="sm" c="red">
-            {error}
-          </Text>
-        )}
       </Stack>
 
       {result && <ResultCard title="GA completed">{summary}</ResultCard>}

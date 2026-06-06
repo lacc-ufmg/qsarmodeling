@@ -2,15 +2,15 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use tauri::path::BaseDirectory;
-use tauri::Manager;
-use tauri::State;
+use tauri::{ipc::Channel, Manager, State};
 
+use crate::core::ga::GaProgressEvent;
 use crate::core::ga::{GAConfig, GAResult};
 use crate::core::loader::DatasetMetadata;
 use crate::core::ops::{OpsConfig, OpsResult};
 
-use crate::core::filter::{FilterConfig, FilterResult};
 use super::session::SessionState;
+use crate::core::filter::{FilterConfig, FilterResult};
 
 #[tauri::command]
 pub async fn load_dataset_cmd(
@@ -38,11 +38,17 @@ pub async fn run_selection_cmd(
 }
 
 #[tauri::command]
+pub async fn ga_send_abort(state: State<'_, SessionState>) -> Result<(), String> {
+    state.ga_send_abort()
+}
+
+#[tauri::command]
 pub async fn run_ga_selection_cmd(
+    channel: Channel<GaProgressEvent>,
     state: State<'_, SessionState>,
     settings: GAConfig,
 ) -> Result<GAResult, String> {
-    state.run_ga(settings)
+    state.run_ga(settings, channel)
 }
 
 #[tauri::command]

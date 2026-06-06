@@ -93,7 +93,7 @@ export function LoadDataPanel() {
       title="Load your data"
       description="Upload CSV files for the descriptor matrix (X) and target variable (y)"
       isComplete={Boolean(uploadedDataset)}
-      disabled={isDisabled && Boolean(uploadedDataset)}
+      disabled={false}
     >
       <Stack>
         {error && (

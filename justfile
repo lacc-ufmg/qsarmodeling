@@ -3,7 +3,7 @@ _default:
 
 
 dev:
-    pnpm run dev
+    RUST_BACKTRACE=1 pnpm run dev
 alias tauridev := dev
 alias td := dev
 alias d := dev

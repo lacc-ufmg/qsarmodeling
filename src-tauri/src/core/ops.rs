@@ -43,6 +43,8 @@ pub struct OpsResult {
     pub evaluation_trace: Vec<(usize, f64)>,
     /// Leave-one-out RMSECV of the winning sub-model.
     pub best_rmsecv: f64,
+    /// Leave-one-out Q² of the winning sub-model.
+    pub best_q2: f64,
 }
 
 impl OpsConfig {
@@ -84,6 +86,7 @@ pub fn run_ops(x: &Array2<f64>, y: &Array1<f64>, config: &OpsConfig) -> OpsResul
 
     let mut trace: Vec<(usize, f64)> = Vec::new();
     let mut best_rmsecv = f64::INFINITY;
+    let mut best_q2 = 0.0;
     let mut best_k = min_k;
 
     let mut k = min_k;
@@ -92,11 +95,12 @@ pub fn run_ops(x: &Array2<f64>, y: &Array1<f64>, config: &OpsConfig) -> OpsResul
 
         // In each LOO fold training has n−1 rows; clamp LVs to stay valid.
         let lv = lv_m.min(k).min(n.saturating_sub(2)).max(1);
-        let (_q2, rmsecv) = loo_q2_rmsecv(&x_sub, y, lv);
+        let (q2, rmsecv) = loo_q2_rmsecv(&x_sub, y, lv);
 
         trace.push((k, rmsecv));
         if rmsecv < best_rmsecv {
             best_rmsecv = rmsecv;
+            best_q2 = q2;
             best_k = k;
         }
 
@@ -111,6 +115,7 @@ pub fn run_ops(x: &Array2<f64>, y: &Array1<f64>, config: &OpsConfig) -> OpsResul
         ranked_indices: ranked,
         evaluation_trace: trace,
         best_rmsecv,
+        best_q2,
     }
 }
 

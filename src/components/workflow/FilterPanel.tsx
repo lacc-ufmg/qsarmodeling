@@ -56,7 +56,7 @@ export function FilterPanel() {
     }
   }, [uploadedDataset, filterSettings, setActiveDataset, setGlobalBusyState]);
 
-  const isDisabled = globalBusyState !== "idle";
+  const locked = !uploadedDataset || globalBusyState !== "idle";
 
   return (
     <StepCard
@@ -64,7 +64,7 @@ export function FilterPanel() {
       title="Filter descriptors"
       description="Remove noisy variables before model selection"
       isComplete={isFiltered}
-      disabled={isDisabled}
+      disabled={!uploadedDataset}
     >
       {error && (
         <Alert icon={<IconAlertCircle size="1rem" />} color="red">
@@ -130,7 +130,7 @@ export function FilterPanel() {
           <Box>
             <Button
               onClick={runFilters}
-              disabled={isDisabled}
+              disabled={locked}
               loading={isLoading}
               variant="default"
               leftSection={<IconFilter size="1rem" />}
