@@ -31,19 +31,13 @@ impl Fitness for VariableSelectionFitness {
             }
         }
 
-        let (_raw_cv_score, penalized_score) =
+        let (_raw_q2, penalized) =
             validation_score(self.x.as_ref(), self.y.as_ref(), &selected, &self.config)?;
-
-        if !penalized_score.is_finite() {
+        if !penalized.is_finite() || penalized <= 0.0 {
             return None;
         }
 
-        let scaled = (penalized_score / self.config.fitness_precision).round();
-        if !scaled.is_finite() {
-            return None;
-        }
-
-        Some(scaled as FitnessValue)
+        Some((penalized / self.config.fitness_precision) as FitnessValue)
     }
 }
 
@@ -69,15 +63,12 @@ pub(super) fn validation_score(
     let n_samples = x_selected.nrows();
     let n_lv = selected.len().min(n_samples.saturating_sub(1)).max(1);
 
-    let (raw_cv_score, rmsecv) = crate::validation::metrics::loo_q2_rmsecv(&x_selected, y, n_lv);
-    if !raw_cv_score.is_finite() || !rmsecv.is_finite() {
-        return None;
-    }
+    let (q2, _rmsecv) = crate::validation::metrics::loo_q2_rmsecv(&x_selected, y, n_lv);
 
     let size_penalty = config.size_penalty * (selected.len() as f64 / x.ncols().max(1) as f64);
-    let penalized_score = raw_cv_score - size_penalty;
+    let penalized_score = q2 - size_penalty;
 
-    Some((raw_cv_score, penalized_score))
+    Some((q2, penalized_score))
 }
 
 /// Score a subset with k-fold CV Q² minus a subset-size penalty.
@@ -87,5 +78,5 @@ pub(super) fn validation_score_ok(
     selected: &[usize],
     config: &GAConfig,
 ) -> (f64, f64) {
-    validation_score(x, y, selected, config).unwrap_or((0.0, f64::INFINITY))
+    validation_score(x, y, selected, config).unwrap_or((0.0, 0.0))
 }

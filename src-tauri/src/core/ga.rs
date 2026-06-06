@@ -141,7 +141,7 @@ pub fn run_ga_with_handle(
         penalized_score,
         fitness_score,
         best_generation: Some(evolve.best_generation()),
-        found_solution: penalized_score.is_finite(),
+        found_solution: penalized_score > 0.0,
     }
 }
 
@@ -301,7 +301,7 @@ mod tests {
 
         assert_eq!(result.selected_count, 0);
         assert!(!result.found_solution);
-        assert!(!result.penalized_score.is_finite());
+        assert!(result.penalized_score <= 0.0);
     }
 
     #[test]

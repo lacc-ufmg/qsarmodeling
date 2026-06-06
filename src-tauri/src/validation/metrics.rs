@@ -94,8 +94,7 @@ pub fn loo_q2_rmsecv(x: &Array2<f64>, y: &Array1<f64>, n_lv: usize) -> (f64, f64
         press += err * err;
     }
 
-    let mean_y = y.iter().copied().sum::<f64>() / n as f64;
-    let ssy = stats::ssy(y, Some(mean_y));
+    let ssy = stats::ssy(y, None);
     if ssy == 0.0 {
         return (0.0, 0.0);
     }
