@@ -1,58 +1,58 @@
-# QSAR Kit
+# QSAR Modeling
 
-A Relação Estrutura-Atividade Quantitativa (QSAR) aplica técnicas de Química Computacional e Machine Learning para prever a atividade (*e.g.*, biológica) de compostos a partir da sua estrutura química.
+**QSAR Modeling** é uma ferramenta desktop para construção e validação de modelos QSAR/QSPR de forma acessível, sem exigir conhecimento especializado em quimioinformática.
 
-**QSAR Kit** é uma ferramenta que permite a construção e validação de modelos QSAR de forma acessível e amigável. Com ela, qualquer pessoa pode, de posse das estruturas químicas dos compostos e suas atividades, gerar um modelo preditivo validado.
+A Relação Estrutura-Atividade Quantitativa (QSAR) combina Química Computacional e _Machine Learning_ para prever propriedades de compostos (biológicas, físico-químicas, etc.) a partir das suas estruturas moleculares. Esse tipo de análise tem aplicações em diversas áreas: Química, Farmacologia, Biologia, Cosmetologia, entre outras.
+
+Totalmente reescrita em Rust, esta nova versão representa um avanço paradigmático em termos de performance, robustez e usabilidade. Leia **[⚡ Por que Rust?](https://github.com/lacc-ufmg/qsarmodeling/wiki/%E2%9A%A1-Por-que-Rust%3F)** para mais detalhes.
+
+## Objetivo e Requisitos
+
+O **objetivo central** deste projeto é viabilizar análises QSAR/QSPR para pesquisadores sem formação específica em quimioinformática. Para isso, os requisitos abaixo guiam todas as decisões técnicas:
+
+| # | Requisito | Descrição |
+|---|-----------|-----------|
+| 1 | **Usabilidade** | Interface intuitiva, acessível a usuários com pouca familiaridade com QSAR |
+| 2 | **Compatibilidade** | Suporte mínimo a Windows e Linux; leitura de formatos comuns (`.csv`, `.xlsx`, etc.) |
+| 3 | **Distribuição** | Instaladores nativos (`.exe`, `.deb`, `.AppImage`, …) sem necessidade de configurar ambiente |
+| 4 | **Performance** | Uso eficiente de recursos: funcionar bem em hardware modesto |
+| 5 | **Robustez** | Comportamento previsível, com testes unitários e de integração garantindo corretude numérica e estatística |
+
+## Funcionalidades planejadas
+
+| Estado | Funcionalidade                     | Detalhes                           |
+| ------ | ---------------------------------- | ---------------------------------- |
+| 🔴     | Carregar estruturas moleculares    | `.mol2`, `.sdf`, ou via SMILES     |
+| 🔴     | Integração com cálculos quânticos  | ORCA, Psi4, Gaussian, etc.         |
+| 🔴     | Geração de descritores moleculares | Inicialmente via LQTAGrid          |
+| 🟢     | Importar descritores moleculares   | `X.csv` ($M\times N$)                            |
+| 🟢     | Importar propriedades-alvo         | `y.csv` ($M\times 1$)                |
+| 🟢     | Filtragem de descritores           |         |
+|      | ↳ Variância                        | Ordered Predictors Selection       |
+|      | ↳ y-correlação                     | Algoritmos Genéticos               |
+|      | ↳ Colinearidade                    | Algoritmos Genéticos               |
+| 🟡     | Seleção de variáveis               | Métodos de seleção automática      |
+|      | ↳ OPS                              | Ordered Predictors Selection       |
+|      | ↳ GA                               | Algoritmos Genéticos               |
+| 🟡     | Construção do modelo               | Pipeline completo de modelagem     |
+| ⚪     | Validação do modelo                | Validações estatísticas e cruzadas |
+| ⚪     | Visualização e exportação          | Resultados e relatórios            |
 
 > [!TIP]
-> Leia: [MVP e Planejamento Estratégico](docs/mvp_planejamento_estrategico.md)
+> ```
+> 🟢 Feito              ⚪ Planejado
+> 🟡 Em andamento       🔴 Futuro/Talvez
+> ```
 
-## Tecnologias
+## Autores e Licença
 
-Não podemos ignorar a existência de muitas funcionalidades no [QSARModelingPy](https://github.com/hellmrf/QSARModelingPy), [HullQSAR](https://github.com/hellmrf/HullQSAR). No entanto, a oportunidade de otimizar a experiência do usuário elege outras tecnologias possíveis.
+Este software é desenvolvido por autores do [LACC-UFMG](https://github.com/lacc-ufmg) e distribuído sob licença GPL v3.0.
 
-Para evitar os custos proibitivos de hospedagem, inicialmente, pensei em distribuir o *software* como um instalável (`.dmg`, `.exe`, `.AppImage` e talvez `snap` ou `flatpak` para Linux) contendo:
+### Principais contribuidores
 
-- App Tauri (Rust)
-- Frontend em React + Vite
+- [**Heliton Martins Reis Filho**](https://github.com/hellmrf) (mantenedor principal)
+- [**Prof. Dr. João Paulo Ataíde Martins**](https://github.com/joaopauloam) (algoritmos originais e supervisão científica)
 
-O usuário poderia:
+## Contribuindo
 
-- Selecionar as estruturas localmente (.mol2, .sdf...) ou via SMILES
-- Selecionar um arquivo ou informar as propriedades-alvo
-- Utilizar as ferramentas disponíveis localmente para fazer os cálculos (orca, psi4, gaussian...)
-- Gerar descritores usando o método escolhido (inicialmente LQTAGrid)
-- Filtrar os descritores (redução de dimensionalidade)
-- Selecionar as melhores variáveis
-- Gerar o modelo completo
-- Rodar as validações
-- Visualizar os resultados
-
-## Desenvolvimento
-
-As dependências são:
-
-- Node v24
-- rustup
-
-### Recommended IDE Setup
-
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
-
-1. Instale o `pnpm`
-```bash
-npm i -g pnpm
-```
-2. Instale as dependências Node.js
-```bash
-pnpm install
-```
-3. Instale o `rustup`
-4. Rode o script `dev`:
-```bash
-pnpm dev
-
-# equivale a:
-just dev
-```
-
+Para contribuir com o projeto, comece lendo a [Wiki](https://github.com/lacc-ufmg/qsarmodeling/wiki/) do repositório.
