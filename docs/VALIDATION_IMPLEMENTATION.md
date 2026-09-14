@@ -1,5 +1,20 @@
 # High-Performance Validation Modules Implementation (Rust)
 
+> [!NOTE]
+> This document describes the **backend implementation only**. As of this writing, none of it is
+> reachable from the app: there is no `#[tauri::command]` wrapping any of these functions, no
+> entry in `invoke_handler!`, no generated TypeScript binding, and no frontend caller — the UI's
+> Validate Model panel is a separate, hardcoded mock. See
+> [`../CLAUDE.md`](../CLAUDE.md#known-issues) § Known Issues and
+> [`USER_JOURNEY.md`](USER_JOURNEY.md) § Step 4 for the current, user-facing state.
+>
+> Also note: the module root has since moved from `validation/mod.rs` (the layout this document
+> was originally written against) to `validation.rs` alongside a `validation/` submodule
+> directory, following the "use modern modules convention" refactor. Code excerpts below that
+> reference `validation/mod.rs` mean that same module, now rooted at `validation.rs`. A
+> `validation/metrics.rs` module was also factored out afterwards to hold the metric computation
+> (Q², RMSEC, RMSECV, R², etc.) shared by `loo.rs`/`lno.rs`/`kfold.rs`.
+
 ## Overview
 
 Successfully implemented comprehensive cross-validation and Y-randomization modules in Rust with high performance optimization. All modules reuse existing PLS infrastructure and leverage ndarray for efficient matrix operations.
@@ -96,7 +111,7 @@ Successfully implemented comprehensive cross-validation and Y-randomization modu
 
 ---
 
-## Type Definitions — [src-tauri/src/validation/mod.rs](src-tauri/src/validation/mod.rs)
+## Type Definitions — [src-tauri/src/validation.rs](src-tauri/src/validation.rs)
 
 ### CVConfig
 ```rust
@@ -288,12 +303,17 @@ All result types derive `Serialize` with `#[serde(rename_all = "camelCase")]`:
 
 ## Files Modified/Created
 
-- ✅ `/src-tauri/src/validation/mod.rs` — Type definitions + module exports
+- ✅ `/src-tauri/src/validation.rs` — Type definitions + module exports (originally
+  `validation/mod.rs`; the crate has since moved to the `validation.rs` + `validation/*.rs`
+  layout)
 - ✅ `/src-tauri/src/validation/loo.rs` — Enhanced with full metrics
 - ✅ `/src-tauri/src/validation/lno.rs` — NEW (Leave-N-Out)
 - ✅ `/src-tauri/src/validation/kfold.rs` — NEW (K-Fold)
 - ✅ `/src-tauri/src/validation/yrand.rs` — Implemented (was empty)
 - ✅ `/src-tauri/src/utils/stats.rs` — Added f_stat() and linear_regression()
+- ℹ️ `/src-tauri/src/validation/metrics.rs` — added later, factored out of the above to hold the
+  shared per-latent-variable metric computation (not part of the original implementation this
+  document describes)
 
 ---
 

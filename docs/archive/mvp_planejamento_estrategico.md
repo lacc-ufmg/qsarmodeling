@@ -1,6 +1,16 @@
 # QSAR Platform — MVP & Planejamento Estratégico
 
 > [!WARNING]
+> **Archived.** This document is self-declared AI-generated (see the original warning below) and
+> was never reviewed. It also describes a technology stack — an axum HTTP/WebSocket backend with
+> the frontend embedded via `rust-embed`, a React frontend on Zustand for state and Plotly.js for
+> charts — that was **not** what got built: the actual app is a Tauri v2 desktop app (Rust
+> backend + React/Vite/Mantine frontend, no axum, no Zustand, no Plotly). Kept for historical
+> context only; do not use it as a description of the current product or architecture. See
+> [`../../CLAUDE.md`](../../CLAUDE.md) and [`../USER_JOURNEY.md`](../USER_JOURNEY.md) for what
+> actually exists today.
+
+> [!WARNING]
 > Documento gerado artificialmente (Claude 4.6 Sonnet) e não revisado.
 
 ## 1. Análise de Dores (Problem Space)
