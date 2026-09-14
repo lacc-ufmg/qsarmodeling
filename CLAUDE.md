@@ -124,6 +124,18 @@ rather than editing by hand.
 
 Tauri's documentation is available for you at @.agents/docs/tauri/llms-full.md .
 
+## MCP servers and skills
+
+This project declares four MCP servers in `.mcp.json`: `tauri-docs` (remote Tauri docs), `mantine`
+(Mantine component docs — useful given the frontend is Mantine-based), `tauri-mcp-server` (can drive
+and screenshot the running Tauri app, e.g. for testing UI changes), and `polars-mcp`.
+
+`.agents/skills/` also bundles ~50 Tauri Claude Code skills (`tauri-app-*` covering individual
+plugins like `dialog`, `fs`, `updater`, `sql`, etc., plus `tauri-scaffold`, `tauri-security`,
+`tauri-ipc`, `tauri-config`, and `tauri` itself as a router/index into the rest) and
+`tauri-mcp-cli`, which wraps `tauri-mcp-server` for driving the app from terminal commands. Prefer
+these over ad-hoc web searches when working on plugin integration or Tauri configuration.
+
 ## Known Issues
 
 Observed during a documentation pass; listed here as facts about the current state, not fixed as
