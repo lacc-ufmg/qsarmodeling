@@ -122,6 +122,8 @@ there's a system tray icon (`app.trayIcon`), and `bundle.targets` is
 must stay in sync across `tauri.conf.json`, `package.json`, and `Cargo.toml` — use `just bump`
 rather than editing by hand.
 
+Tauri's documentation is available for you at @.agents/docs/tauri/llms-full.md .
+
 ## Known Issues
 
 Observed during a documentation pass; listed here as facts about the current state, not fixed as

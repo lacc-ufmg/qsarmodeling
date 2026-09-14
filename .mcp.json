@@ -1,0 +1,30 @@
+{
+    "mcpServers": {
+        "tauri-docs": {
+            "command": "pnpx",
+            "args": [
+                "-y",
+                "mcp-remote",
+                "https://tauri-docs.mastra.cloud/api/mcp/tauri-docs/mcp"
+            ]
+        },
+        "tauri-mcp-server": {
+            "command": "pnpx",
+            "args": [
+                "-y",
+                "@hypothesi/tauri-mcp-server"
+            ]
+        },
+        "mantine": {
+            "command": "pnpx",
+            "args": [
+                "-y",
+                "@mantine/mcp-server"
+            ]
+        },
+        "polars-mcp": {
+            "url": "https://mcp.pola.rs/mcp",
+            "type": "http"
+        }
+    }
+}

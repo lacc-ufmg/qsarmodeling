@@ -18,6 +18,12 @@
       "sourceType": "github",
       "skillPath": "skills/mantine-form/SKILL.md",
       "computedHash": "1bf98bd02676810bf420019b501ffaaba61774869b2b758dd5518620311ef518"
+    },
+    "tauri-mcp-cli": {
+      "source": "hypothesi/mcp-server-tauri",
+      "sourceType": "github",
+      "skillPath": "packages/cli/skills/tauri-mcp-cli/SKILL.md",
+      "computedHash": "8e6c5f71bdc4a205559d7b6b13db1c97e92d38c4fc76b595450ab16269eef60a"
     }
   }
 }
