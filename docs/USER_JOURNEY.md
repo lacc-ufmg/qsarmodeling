@@ -1,6 +1,6 @@
 # User Journey
 
-A step-by-step walkthrough of what QSAR Kit's UI actually does today. This describes the real
+A step-by-step walkthrough of what the qsarmodelers UI actually does today. This describes the real
 app, not an idealized one — see the callouts for places where the UI's behavior doesn't quite
 match what a user would expect. For the underlying code structure, see
 [`../CLAUDE.md`](../CLAUDE.md); for a consolidated list of known gaps, see its
@@ -9,7 +9,7 @@ detail).
 
 ## The app shell
 
-QSAR Kit is a **single page**, not a wizard: all four workflow panels — Load Data, Filter
+qsarmodelers is a **single page**, not a wizard: all four workflow panels — Load Data, Filter
 Descriptors, Select Variables, Validate Model — are stacked vertically inside one
 `WorkflowProvider` and are always present on screen (`src/App.tsx`). What changes as you progress
 is:

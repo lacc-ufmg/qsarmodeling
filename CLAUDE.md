@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-QSAR Kit is a Tauri v2 desktop app (Rust backend + React/Vite frontend) for building and
+qsarmodelers is a Tauri v2 desktop app (Rust backend + React/Vite frontend) for building and
 validating QSAR (Quantitative Structure-Activity Relationship) predictive models from chemical
 descriptor data. The user-facing workflow has four steps, presented as stacked panels in a single
 page app: **Load data → Filter descriptors → Select variables (OPS or GA) → Validate model**. The
@@ -29,7 +29,7 @@ cargo fmt            # just fmt / just f   — format Rust code
 cargo tauri-typegen generate   # just typegen / just gen / just g
 ```
 
-- Run a single Rust test: `cargo test <test_name>` (or `cargo test -p qsarmodeling_lib <test_name>`
+- Run a single Rust test: `cargo test <test_name>` (or `cargo test -p qsarmodelers_lib <test_name>`
   from `src-tauri/`). Unit tests live inline (`mod tests`) at the bottom of most `core/*` and
   `validation/*` files.
 - Benchmarks: `cargo bench` (see `src-tauri/benches/load_dataset.rs`, uses `criterion`).

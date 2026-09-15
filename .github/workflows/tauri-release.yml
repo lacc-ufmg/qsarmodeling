@@ -64,11 +64,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          appName: "QSARModeling"
+          appName: "qsarmodelers"
           tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
           releaseName: v__VERSION__
           releaseBody: |
-            Early-stage release of QSARModeling. This is still very experimental and therefore many bugs are known and expected.
+            Early-stage release of qsarmodelers. This is still very experimental and therefore many bugs are known and expected.
 
             You can use the [example datasets](https://github.com/hellmrf/qsarmodeling/tree/refs/tags/v__VERSION__/src-tauri/examples/data) to test the application.
 

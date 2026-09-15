@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "QSAR Modeling",
+  "productName": "qsarmodelers",
   "version": "0.4.4",
-  "identifier": "com.hellmrf.qsarmodeling",
+  "identifier": "com.hellmrf.qsarmodelers",
   "build": {
     "beforeDevCommand": "pnpm run vitedev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "QSAR Modeling",
+        "title": "qsarmodelers",
         "width": 1080,
         "height": 800,
         "minWidth": 900,
@@ -45,7 +45,7 @@
     ],
     "category": "Utility",
     "shortDescription": "Quantitative Structure–Activity Relationship modelling",
-    "longDescription": "QSAR Modeling allows researchers to build, evaluate and apply QSAR/QSPR models for molecular property prediction. All data stays local.",
+    "longDescription": "qsarmodelers allows researchers to build, evaluate and apply QSAR/QSPR models for molecular property prediction. All data stays local.",
     "copyright": "Copyright © 2026 Heliton Martins. All rights reserved.",
     "publisher": "LACC-UFMG",
     "homepage": "https://github.com/hellmrf/qsarmodeling",

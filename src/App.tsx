@@ -38,7 +38,7 @@ export default function App () {
             <Group gap="md" align="center">
               <img src={icon} alt="App Icon" width={48} />
               <Box>
-                <Text fw={700}>QSAR Modeling</Text>
+                <Text fw={700}>qsarmodelers</Text>
                 <Text size="xs" tt="uppercase" fw={600} c="dimmed">
                   v{version}
                 </Text>

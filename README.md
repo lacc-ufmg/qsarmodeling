@@ -1,17 +1,17 @@
-# QSAR Kit
+# qsarmodelers
 
 Quantitative Structure-Activity Relationship (QSAR) modeling applies computational chemistry and
 machine learning techniques to predict a compound's activity (*e.g.*, biological) from its
 chemical structure.
 
-**QSAR Kit** is a tool for building and validating QSAR models in an accessible, user-friendly
+**qsarmodelers** is a tool for building and validating QSAR models in an accessible, user-friendly
 way. Given the chemical structures of a set of compounds and their measured activities, it lets
 anyone generate a validated predictive model.
 
 > [!NOTE]
-> `tauri.conf.json`'s `productName` is "QSAR Modeling" and the Cargo crate/package.json name is
-> `qsarmodeling` — both predate the "QSAR Kit" name used in this README and elsewhere. This is a
-> known naming inconsistency, described here rather than resolved unilaterally.
+> qsarmodelers is a new version of [QSARModeling](https://github.com/hellmrf/QSARModelingPy),
+> rewritten in Rust as a Tauri desktop app. The name is a stylization of "QSAR Modeler" + `.rs`,
+> alluding to the earlier implementations it succeeds (`qsarmodeling`, `qsarmodelingpy`).
 
 ## What works today
 
